@@ -1,0 +1,9 @@
+Running initialization event_loop...
+Done, starting main event_loop...
+FPS: 1487  (frame time: 605.232µs)
+FPS: 1354  (frame time: 637.066µs)
+FPS: 998  (frame time: 823.317µs)
+FPS: 1133  (frame time: 755.945µs)
+FPS: 1075  (frame time: 639.838µs)
+FPS: 1  (frame time: 703.3µs)
+FPS: 1079  (frame time: 624.834µs)

@@ -1,0 +1,15 @@
+{
+	"cSpell.words": [
+		"bytemuck",
+		"cgmath",
+		"elwt",
+		"mipmap",
+		"multisample",
+		"multisampled",
+		"multiview",
+		"OPENGL",
+		"repr",
+		"Unorm",
+		"wgsl"
+	]
+}
