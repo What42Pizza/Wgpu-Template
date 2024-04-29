@@ -27,13 +27,12 @@ pub fn render(program_data: &mut ProgramData) -> StdResult<(), wgpu::SurfaceErro
 		occlusion_query_set: None,
 		timestamp_writes: None,
 	});
-	let main_pipeline = &program_data.render_pipelines.main;
-	main_pass_handle.set_pipeline(&main_pipeline.render_pipeline);
+	main_pass_handle.set_pipeline(&program_data.render_pipelines.main);
 	main_pass_handle.set_bind_group(0, &program_data.uniform_datas.camera_binding.group, &[]);
 	main_pass_handle.set_bind_group(1, &program_data.asset_datas.happy_tree_binding.group, &[]);
-	main_pass_handle.set_vertex_buffer(0, main_pipeline.vertex_buffer.slice(..));
-	main_pass_handle.set_index_buffer(main_pipeline.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-	main_pass_handle.draw_indexed(0..main_pipeline.index_count, 0, 0..1);
+	main_pass_handle.set_vertex_buffer(0, program_data.world_datas.main_vertices.slice(..));
+	main_pass_handle.set_index_buffer(program_data.world_datas.main_indices.slice(..), wgpu::IndexFormat::Uint16);
+	main_pass_handle.draw_indexed(0..program_data.world_datas.main_index_count, 0, 0..1);
 	drop(main_pass_handle);
 	
 	program_data.render_context.command_queue.submit(std::iter::once(encoder.finish()));

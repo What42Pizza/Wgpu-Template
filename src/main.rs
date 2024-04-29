@@ -1,13 +1,13 @@
 // started:      24/04/18
-// last updated: 24/04/28
+// last updated: 24/04/29
 
 
 
 #![feature(duration_constants)]
 #![feature(let_chains)]
 
-#![allow(unused)]
-#![warn(unused_must_use)]
+//#![allow(unused)]
+//#![warn(unused_must_use)]
 
 #![allow(clippy::new_without_default)]
 #![warn(clippy::todo)]
@@ -19,6 +19,7 @@
 
 
 pub mod load;
+pub mod update;
 pub mod render;
 pub mod wgpu_integration;
 pub mod data;
@@ -26,7 +27,12 @@ pub mod utils;
 
 pub mod prelude {
 	pub use crate::{*, data::*};
-	pub use std::{fs, path::{Path, PathBuf}, time::{Duration, Instant}};
+	pub use std::{
+		fs,
+		collections::HashMap,
+		path::{Path, PathBuf},
+		time::{Duration, Instant}
+	};
 	pub use std::result::Result as StdResult;
 	//pub use log::{info, warn};
 	pub use anyhow::*;
@@ -37,10 +43,11 @@ use std::mem;
 use winit::{
 	application::ApplicationHandler,
 	dpi::PhysicalSize,
-	platform::pump_events::EventLoopExtPumpEvents,
-	event::{ElementState, KeyEvent, WindowEvent},
+	event::{KeyEvent, WindowEvent},
 	event_loop::{ActiveEventLoop, EventLoop},
-	window::{Window, WindowId},
+	keyboard::PhysicalKey,
+	platform::pump_events::EventLoopExtPumpEvents,
+	window::{Window, WindowId}
 };
 
 
@@ -140,35 +147,22 @@ impl<'a> ApplicationHandler for ProgramData<'a> {
 			},
 			
 			WindowEvent::KeyboardInput {
-				event: KeyEvent { logical_key: key, state: ElementState::Pressed, .. },
+				event: KeyEvent {
+					physical_key: PhysicalKey::Code (key),
+					state,
+					..
+				},
 				..
-			} => match key.as_ref() {
-				// WARNING: Consider using `key_without_modifiers()` if available on your platform.
-				// See the `key_binding` example
-				_ => (),
+			} => {
+				program_data.pressed_keys.insert(key, state.is_pressed());
 			},
 			
 			WindowEvent::RedrawRequested => {
-				
-				let frame_start_time = Instant::now();
-				let render_result = render::render(program_data);
-				match render_result {
-					StdResult::Ok(_) => {}
-					StdResult::Err(wgpu::SurfaceError::Lost) => {
-						let size = program_data.render_context.size;
-						resize(&mut program_data.render_context, size).expect("Could not resize window.");
-					}
-					StdResult::Err(wgpu::SurfaceError::OutOfMemory) => {
-						warn!("OutOfMemory error while rendering, exiting process.");
-						event_loop.exit();
-					},
-					StdResult::Err(e) => warn!("Error while rendering: {e:?}"),
+				let result = redraw_requested(program_data, event_loop);
+				if let Err(err) = result {
+					log!("Fatal error while processing frame: {err}");
+					event_loop.exit();
 				}
-				let fps_counter_output = program_data.fps_counter.step(frame_start_time.elapsed());
-				if let Some((average_fps, average_frame_time)) = fps_counter_output {
-					log!("FPS: {average_fps}  (frame time: {average_frame_time:?})");
-				}
-				
 			},
 			
 			WindowEvent::Resized (new_size) => {
@@ -197,5 +191,39 @@ pub fn resize(render_context: &mut wgpu_integration::RenderContextData, new_size
 	render_context.surface_config.width = new_size.width;
 	render_context.surface_config.height = new_size.height;
 	render_context.drawable_surface.configure(&render_context.device, &render_context.surface_config);
+	Ok(())
+}
+
+
+
+pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEventLoop) -> Result<()> {
+	
+	let frame_start_time = Instant::now();
+	
+	let dt = program_data.step_dt();
+	update::update(program_data, dt)?;
+	
+	let render_result = render::render(program_data);
+	if let Err(err) = render_result {
+		match err {
+			wgpu::SurfaceError::Lost => {
+				let size = program_data.render_context.size;
+				warn!("Swap chain lost, attempting to resize...");
+				resize(&mut program_data.render_context, size).context("Failed to resize window.")?;
+			}
+			wgpu::SurfaceError::OutOfMemory => {
+				warn!("OutOfMemory error while rendering, exiting process.");
+				event_loop.exit();
+				return Ok(());
+			}
+			err => return Err(err.into()),
+		}
+	}
+	
+	let fps_counter_output = program_data.fps_counter.step(frame_start_time.elapsed());
+	if let Some((average_fps, average_frame_time)) = fps_counter_output {
+		log!("FPS: {average_fps}  (avg frame time: {average_frame_time:?})");
+	}
+	
 	Ok(())
 }

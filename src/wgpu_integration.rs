@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use async_std::task::block_on;
-use wgpu::util::DeviceExt;
 use winit::window::Window;
 
 
@@ -18,16 +17,13 @@ pub struct RenderContextData<'a> {
 
 
 
-pub struct RenderPipelineData {
-	pub render_pipeline: wgpu::RenderPipeline,
-	pub vertex_buffer: wgpu::Buffer,
-	pub index_buffer: wgpu::Buffer,
-	pub index_count: u32,
+pub struct TextureBindData {
+	pub group: wgpu::BindGroup,
+	pub layout: wgpu::BindGroupLayout,
 }
 
-
-
-pub struct BindingData {
+pub struct GeneralBindData {
+	pub buffer: wgpu::Buffer,
 	pub group: wgpu::BindGroup,
 	pub layout: wgpu::BindGroupLayout,
 }
@@ -55,39 +51,19 @@ impl Vertex {
 
 
 
-#[repr(C)]
-#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct CameraUniform {
-	pub view_proj: [[f32; 4]; 4],
+
+
+pub fn init_wgpu_context_data<'a>(window: &'a Window, engine_config: &load::EngineConfig) -> Result<RenderContextData<'a>> {
+	block_on(init_wgpu_context_data_async(window, engine_config))
 }
 
-impl CameraUniform {
-	pub fn new() -> Self {
-		use cgmath::SquareMatrix;
-		Self {
-			view_proj: cgmath::Matrix4::identity().into(),
-		}
-	}
-	pub fn update_view_proj(&mut self, camera: &Camera, aspect_ratio: f32) {
-		self.view_proj = camera.build_view_projection_matrix(aspect_ratio).into();
-	}
-}
-
-
-
-
-
-pub fn init_wgpu_context_data(window: &Window) -> Result<RenderContextData> {
-	block_on(init_wgpu_context_data_async(window))
-}
-
-pub async fn init_wgpu_context_data_async(window: &Window) -> Result<RenderContextData> {
+pub async fn init_wgpu_context_data_async<'a>(window: &'a Window, engine_config: &load::EngineConfig) -> Result<RenderContextData<'a>> {
 	let size = window.inner_size();
 	
 	// The instance is a handle to our GPU
 	// Backends::all => Vulkan + Metal + DX12 + Browser WebGPU
 	let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-		backends: wgpu::Backends::all(),
+		backends: engine_config.rendering_backend,
 		..Default::default()
 	});
 	
@@ -130,11 +106,10 @@ pub async fn init_wgpu_context_data_async(window: &Window) -> Result<RenderConte
 		format: surface_format,
 		width: size.width,
 		height: size.height,
-		//present_mode: surface_caps.present_modes[0],
-		present_mode: wgpu::PresentMode::Immediate,
+		present_mode: engine_config.present_mode,
 		alpha_mode: surface_caps.alpha_modes[0],
 		view_formats: vec![],
-		desired_maximum_frame_latency: 2,
+		desired_maximum_frame_latency: engine_config.desired_frame_latency,
 	};
 	surface.configure(&device, &config);
 	
@@ -155,40 +130,23 @@ pub async fn init_wgpu_context_data_async(window: &Window) -> Result<RenderConte
 pub fn init_wgpu_pipeline(
 	name: &str,
 	shader_path: impl AsRef<Path>,
-	vertices: &[Vertex],
-	indices: &[u16],
 	bind_group_layouts: &[&wgpu::BindGroupLayout],
-	wgpu_context: &RenderContextData,
-) -> Result<RenderPipelineData> {
-	
-	let vertex_buffer = wgpu_context.device.create_buffer_init(
-		&wgpu::util::BufferInitDescriptor {
-			label: Some("Vertex Buffer"),
-			contents: bytemuck::cast_slice(vertices),
-			usage: wgpu::BufferUsages::VERTEX,
-		}
-	);
-	let index_buffer = wgpu_context.device.create_buffer_init(
-		&wgpu::util::BufferInitDescriptor {
-			label: Some("Index Buffer"),
-			contents: bytemuck::cast_slice(indices),
-			usage: wgpu::BufferUsages::INDEX,
-		}
-	);
+	render_context: &RenderContextData,
+) -> Result<wgpu::RenderPipeline> {
 	
 	let shader_source = fs::read_to_string(shader_path)?;
-	let shader = wgpu_context.device.create_shader_module(wgpu::ShaderModuleDescriptor {
+	let shader = render_context.device.create_shader_module(wgpu::ShaderModuleDescriptor {
 		label: Some(name),
 		source: wgpu::ShaderSource::Wgsl(shader_source.into()),
 	});
 	
-	let render_pipeline_layout = wgpu_context.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+	let render_pipeline_layout = render_context.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 		label: Some(name),
 		bind_group_layouts,
 		push_constant_ranges: &[],
 	});
 	
-	let render_pipeline = wgpu_context.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+	let render_pipeline = render_context.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
 		label: Some(name),
 		layout: Some(&render_pipeline_layout),
 		vertex: wgpu::VertexState {
@@ -201,7 +159,7 @@ pub fn init_wgpu_pipeline(
 			module: &shader,
 			entry_point: "fs_main",
 			targets: &[Some(wgpu::ColorTargetState {
-				format: wgpu_context.surface_config.format,
+				format: render_context.surface_config.format,
 				blend: Some(wgpu::BlendState::REPLACE),
 				write_mask: wgpu::ColorWrites::ALL,
 			})],
@@ -225,19 +183,14 @@ pub fn init_wgpu_pipeline(
 		multiview: None,
 	});
 	
-	Ok(RenderPipelineData {
-		render_pipeline,
-		vertex_buffer,
-		index_buffer,
-		index_count: indices.len() as u32,
-	})
+	Ok(render_pipeline)
 }
 
 
 
 
 
-pub fn load_texture(path: impl AsRef<Path>, render_context: &RenderContextData) -> Result<BindingData> {
+pub fn load_texture(path: impl AsRef<Path>, render_context: &RenderContextData) -> Result<TextureBindData> {
 	
 	let raw_texture_bytes = fs::read(utils::get_program_file_path(path))?;
 	let texture_bytes = image::load_from_memory(&raw_texture_bytes)?;
@@ -337,7 +290,7 @@ pub fn load_texture(path: impl AsRef<Path>, render_context: &RenderContextData) 
 		}
 	);
 	
-	Ok(BindingData {
+	Ok(TextureBindData {
 		group: bind_group,
 		layout: bind_group_layout,
 	})

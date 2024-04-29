@@ -1,3 +1,7 @@
 Running initialization event_loop...
 Done, starting main event_loop...
-FPS: 880  (frame time: 925.72µs)
+FPS: 61  (avg frame time: 16.218073ms)
+FPS: 60  (avg frame time: 16.488093ms)
+FPS: 60  (avg frame time: 16.498033ms)
+FPS: 60  (avg frame time: 16.550996ms)
+FPS: 60  (avg frame time: 16.435913ms)

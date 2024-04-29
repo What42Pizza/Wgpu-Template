@@ -1,10 +1,15 @@
 use crate::prelude::*;
+use cgmath::SquareMatrix;
+use winit::keyboard::KeyCode;
 
 
 
 pub struct ProgramData<'a> {
 	
 	pub window: &'a Window,
+	pub pressed_keys: HashMap<KeyCode, bool>,
+	pub frame_instant: Instant,
+	
 	pub render_context: wgpu_integration::RenderContextData<'a>,
 	pub uniform_datas: UniformDatas,
 	pub asset_datas: AssetDatas,
@@ -17,25 +22,38 @@ pub struct ProgramData<'a> {
 	
 }
 
+impl<'a> ProgramData<'a> {
+	pub fn key_is_down(&self, key: KeyCode) -> bool {
+		self.pressed_keys.get(&key).cloned().unwrap_or(false)
+	}
+	pub fn step_dt(&mut self) -> f32 {
+		let new_frame_instant = Instant::now();
+		let dt = (new_frame_instant - self.frame_instant).as_secs_f32();
+		self.frame_instant = new_frame_instant;
+		dt
+	}
+}
+
 
 
 pub struct UniformDatas {
-	pub camera_data: wgpu_integration::CameraUniform,
-	pub camera_binding: wgpu_integration::BindingData,
+	pub camera_binding: wgpu_integration::GeneralBindData,
 }
 
 pub struct AssetDatas {
-	pub happy_tree_binding: wgpu_integration::BindingData,
+	pub happy_tree_binding: wgpu_integration::TextureBindData,
 }
 
 pub struct WorldDatas {
-	
+	pub main_vertices: wgpu::Buffer,
+	pub main_indices: wgpu::Buffer,
+	pub main_index_count: u32,
 }
 
 
 
 pub struct RenderPipelines {
-	pub main: wgpu_integration::RenderPipelineData,
+	pub main: wgpu::RenderPipeline,
 }
 
 
@@ -59,7 +77,10 @@ impl Camera {
 	pub fn build_view_projection_matrix(&self, aspect_ratio: f32) -> cgmath::Matrix4<f32> {
 		let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
 		let proj = cgmath::perspective(cgmath::Deg (self.fov), aspect_ratio, self.near, self.far);
-		return Self::OPENGL_TO_WGPU_MATRIX * proj * view;
+		Self::OPENGL_TO_WGPU_MATRIX * proj * view
+	}
+	pub fn default_data() -> [[f32; 4]; 4] {
+		cgmath::Matrix4::identity().into()
 	}
 	pub fn new(pos: (f32, f32, f32)) -> Self {
 		Self {

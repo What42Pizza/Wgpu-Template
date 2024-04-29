@@ -1,5 +1,5 @@
 [package]
-name = "wgpu-testing"
+name = "wgpu-template"
 version = "0.1.0"
 edition = "2021"
 
@@ -12,6 +12,8 @@ env_logger = "0.11.3"
 image = "0.25.1"
 lazy_static = "1.4.0"
 log = "0.4.21"
+serde = "1.0.199"
+serde-hjson = "0.9.1"
 wgpu = "0.20.0"
 winit = "0.30.0"
 
