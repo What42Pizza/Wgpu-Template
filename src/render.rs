@@ -2,8 +2,7 @@ use crate::prelude::*;
 
 
 
-pub fn render(program_data: &mut ProgramData) -> StdResult<(), wgpu::SurfaceError> {
-	let output = program_data.render_context.drawable_surface.get_current_texture()?;
+pub fn render(output: &wgpu::SurfaceTexture, program_data: &mut ProgramData) -> StdResult<(), wgpu::SurfaceError> {
 	let output_view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 	let encoder_descriptor = wgpu::CommandEncoderDescriptor {label: Some("Render Encoder")};
 	let mut encoder = program_data.render_context.device.create_command_encoder(&encoder_descriptor);
@@ -23,7 +22,14 @@ pub fn render(program_data: &mut ProgramData) -> StdResult<(), wgpu::SurfaceErro
 				store: wgpu::StoreOp::Store,
 			},
 		})],
-		depth_stencil_attachment: None,
+		depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+			view: &program_data.uniform_datas.depth_texture.view,
+			depth_ops: Some(wgpu::Operations {
+				load: wgpu::LoadOp::Clear(1.0),
+				store: wgpu::StoreOp::Store,
+			}),
+			stencil_ops: None,
+		}),
 		occlusion_query_set: None,
 		timestamp_writes: None,
 	});
@@ -31,13 +37,12 @@ pub fn render(program_data: &mut ProgramData) -> StdResult<(), wgpu::SurfaceErro
 	main_pass_handle.set_bind_group(0, &program_data.uniform_datas.camera_binding.group, &[]);
 	main_pass_handle.set_bind_group(1, &program_data.asset_datas.happy_tree_binding.group, &[]);
 	main_pass_handle.set_vertex_buffer(0, program_data.world_datas.main_vertices.slice(..));
+	main_pass_handle.set_vertex_buffer(1, program_data.world_datas.main_instances_buffer.slice(..));
 	main_pass_handle.set_index_buffer(program_data.world_datas.main_indices.slice(..), wgpu::IndexFormat::Uint16);
-	main_pass_handle.draw_indexed(0..program_data.world_datas.main_index_count, 0, 0..1);
+	main_pass_handle.draw_indexed(0..program_data.world_datas.main_index_count, 0, 0..program_data.world_datas.main_instances.len() as u32);
 	drop(main_pass_handle);
 	
 	program_data.render_context.command_queue.submit(std::iter::once(encoder.finish()));
-	program_data.window.pre_present_notify();
-	output.present();
 	
 	StdResult::Ok(())
 }

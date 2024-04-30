@@ -1,6 +1,7 @@
 use crate::prelude::*;
 use serde_hjson::{Map, Value};
 use wgpu::util::DeviceExt;
+use cgmath::prelude::*;
 
 
 
@@ -19,7 +20,8 @@ pub fn init_program_data(start_time: Instant, window: &Window) -> Result<Program
 		
 		window,
 		pressed_keys: HashMap::new(),
-		frame_instant: start_time,
+		frame_start_instant: start_time,
+		min_frame_time: engine_config.min_frame_time,
 		
 		render_context,
 		render_pipelines,
@@ -40,6 +42,7 @@ pub struct EngineConfig {
 	pub rendering_backend: wgpu::Backends,
 	pub present_mode: wgpu::PresentMode,
 	pub desired_frame_latency: u32,
+	pub min_frame_time: Duration,
 }
 
 pub fn load_engine_config() -> Result<EngineConfig> {
@@ -50,7 +53,7 @@ pub fn load_engine_config() -> Result<EngineConfig> {
 		StdResult::Ok(v) => &**v,
 		StdResult::Err(err) => {
 			warn!("Failed to read 'engine config.hjson', using default values...  (error: {err})");
-			include_str!("../data/engine config.hjson")
+			include_str!("../data/default engine config.hjson")
 		}
 	};
 	let engine_config: Map<String, Value> = serde_hjson::from_str(engine_config_string).context("Failed to decode 'engine config.hjson'")?;
@@ -85,10 +88,14 @@ pub fn load_engine_config() -> Result<EngineConfig> {
 	let desired_frame_latency_i64 = read_hjson_i64(&engine_config, "desired_frame_latency", 1);
 	let desired_frame_latency = desired_frame_latency_i64 as u32;
 	
+	let min_frame_time_f64 = read_hjson_f64(&engine_config, "min_frame_time", 0.002);
+	let min_frame_time = Duration::from_secs_f64(min_frame_time_f64);
+	
 	Ok(EngineConfig {
 		rendering_backend,
 		present_mode,
 		desired_frame_latency,
+		min_frame_time,
 	})
 }
 
@@ -111,6 +118,18 @@ pub fn read_hjson_i64(map: &Map<String, Value>, key: &'static str, default: i64)
 		default
 	}));
 	value_i64.unwrap_or_else(|| {
+		log!("Could not find entry '{key}' in 'engine config.hjson', defaulting to \"{default}\".");
+		default
+	})
+}
+
+pub fn read_hjson_f64(map: &Map<String, Value>, key: &'static str, default: f64) -> f64 {
+	let value_str = map.get(key);
+	let value_f64 = value_str.map(|v| v.as_f64().unwrap_or_else(|| {
+		log!("Entry '{key}' in 'engine config.hjson' must be an int, defaulting to \"{default}\".");
+		default
+	}));
+	value_f64.unwrap_or_else(|| {
 		log!("Could not find entry '{key}' in 'engine config.hjson', defaulting to \"{default}\".");
 		default
 	})
@@ -156,12 +175,15 @@ pub fn load_uniform_datas(render_context: &wgpu_integration::RenderContextData) 
 		label: Some("camera_bind_group"),
 	});
 	
+	let depth_texture = wgpu_integration::create_depth_texture("depth_texture", render_context);
+	
 	Ok(UniformDatas {
 		camera_binding: wgpu_integration::GeneralBindData {
 			buffer: camera_buffer,
 			layout: camera_bind_group_layout,
 			group: camera_bind_group,
 		},
+		depth_texture,
 	})
 }
 
@@ -195,10 +217,43 @@ pub fn load_world_datas(render_context: &wgpu_integration::RenderContextData) ->
 		}
 	);
 	
+	let main_instances = (0..100).flat_map(|z| {
+		(0..100).map(move |x| {
+			let position = cgmath::Vector3 { x: x as f32, y: 0.0, z: z as f32 } - cgmath::Vector3::new(0.5, 0.0, 0.5);
+			
+			let rotation = if position.is_zero() {
+				// this is needed so an object at (0, 0, 0) won't get scaled to zero
+				// as Quaternions can affect scale if they're not created correctly
+				cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
+			} else {
+				cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
+			};
+			
+			Instance {
+				position,
+				rotation,
+			}
+		})
+	}).collect::<Vec<_>>();
+	
+	let main_instances_data = main_instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+	let main_instances_buffer = render_context.device.create_buffer_init(
+		&wgpu::util::BufferInitDescriptor {
+			label: Some("Instance Buffer"),
+			contents: bytemuck::cast_slice(&main_instances_data),
+			usage: wgpu::BufferUsages::VERTEX,
+		}
+	);
+	
 	Ok(WorldDatas {
+		
 		main_vertices: vertex_buffer,
 		main_indices: index_buffer,
 		main_index_count: INDICES.len() as u32,
+		
+		main_instances,
+		main_instances_buffer,
+		
 	})
 }
 
@@ -213,6 +268,10 @@ pub fn load_pipelines(render_context: &wgpu_integration::RenderContextData, unif
 		&[
 			&uniform_datas.camera_binding.layout,
 			&asset_datas.happy_tree_binding.layout,
+		],
+		&[
+			GenericVertex::get_layout(),
+			InstanceRaw::get_layout()
 		],
 		render_context,
 	)?;

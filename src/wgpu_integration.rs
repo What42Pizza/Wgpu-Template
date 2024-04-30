@@ -22,31 +22,16 @@ pub struct TextureBindData {
 	pub layout: wgpu::BindGroupLayout,
 }
 
+pub struct DepthTextureData {
+	pub texture: wgpu::Texture,
+	pub view: wgpu::TextureView,
+	pub sampler: wgpu::Sampler,
+}
+
 pub struct GeneralBindData {
 	pub buffer: wgpu::Buffer,
 	pub group: wgpu::BindGroup,
 	pub layout: wgpu::BindGroupLayout,
-}
-
-
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct Vertex {
-	pub position: [f32; 3],
-	pub tex_coords: [f32; 2],
-}
-
-impl Vertex {
-	pub const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
-		wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2];
-	pub const fn get_layout() -> wgpu::VertexBufferLayout<'static> {
-		wgpu::VertexBufferLayout {
-			array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
-			step_mode: wgpu::VertexStepMode::Vertex,
-			attributes: &Self::ATTRIBUTES,
-		}
-	}
 }
 
 
@@ -131,6 +116,7 @@ pub fn init_wgpu_pipeline(
 	name: &str,
 	shader_path: impl AsRef<Path>,
 	bind_group_layouts: &[&wgpu::BindGroupLayout],
+	buffer_layouts: &[wgpu::VertexBufferLayout],
 	render_context: &RenderContextData,
 ) -> Result<wgpu::RenderPipeline> {
 	
@@ -152,7 +138,7 @@ pub fn init_wgpu_pipeline(
 		vertex: wgpu::VertexState {
 			module: &shader,
 			entry_point: "vs_main",
-			buffers: &[Vertex::get_layout()],
+			buffers: buffer_layouts,
 			compilation_options: wgpu::PipelineCompilationOptions::default(),
 		},
 		fragment: Some(wgpu::FragmentState {
@@ -174,7 +160,13 @@ pub fn init_wgpu_pipeline(
 			unclipped_depth: false,
 			conservative: false,
 		},
-		depth_stencil: None,
+		depth_stencil: Some(wgpu::DepthStencilState {
+			format: wgpu::TextureFormat::Depth32Float,
+			depth_write_enabled: true,
+			depth_compare: wgpu::CompareFunction::Less,
+			stencil: wgpu::StencilState::default(),
+			bias: wgpu::DepthBiasState::default(),
+		}),
 		multisample: wgpu::MultisampleState {
 			count: 1,
 			mask: !0u64,
@@ -294,4 +286,48 @@ pub fn load_texture(path: impl AsRef<Path>, render_context: &RenderContextData) 
 		group: bind_group,
 		layout: bind_group_layout,
 	})
+}
+
+
+
+pub fn create_depth_texture(label: &str, render_context: &RenderContextData) -> DepthTextureData {
+	
+	let size = wgpu::Extent3d {
+		width: render_context.surface_config.width,
+		height: render_context.surface_config.height,
+		depth_or_array_layers: 1,
+	};
+	let desc = wgpu::TextureDescriptor {
+		label: Some(label),
+		size,
+		mip_level_count: 1,
+		sample_count: 1,
+		dimension: wgpu::TextureDimension::D2,
+		format: wgpu::TextureFormat::Depth32Float,
+		usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+		view_formats: &[],
+	};
+	let texture = render_context.device.create_texture(&desc);
+	
+	let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+	let sampler = render_context.device.create_sampler(
+		&wgpu::SamplerDescriptor {
+			address_mode_u: wgpu::AddressMode::ClampToEdge,
+			address_mode_v: wgpu::AddressMode::ClampToEdge,
+			address_mode_w: wgpu::AddressMode::ClampToEdge,
+			mag_filter: wgpu::FilterMode::Linear,
+			min_filter: wgpu::FilterMode::Linear,
+			mipmap_filter: wgpu::FilterMode::Nearest,
+			compare: Some(wgpu::CompareFunction::LessEqual),
+			lod_min_clamp: 0.0,
+			lod_max_clamp: 100.0,
+			..Default::default()
+		}
+	);
+	
+	DepthTextureData {
+		texture,
+		view,
+		sampler
+	}
 }

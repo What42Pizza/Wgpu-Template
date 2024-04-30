@@ -1,0 +1,14 @@
+model loading
+skybox
+shadows
+water
+post-processing
+	color correction
+	bloom
+	taa
+
+for later projects:
+terrain generation
+tree generation
+player movement
+collision system?

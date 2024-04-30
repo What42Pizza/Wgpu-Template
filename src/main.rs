@@ -6,8 +6,8 @@
 #![feature(duration_constants)]
 #![feature(let_chains)]
 
-//#![allow(unused)]
-//#![warn(unused_must_use)]
+#![allow(unused)]
+#![warn(unused_must_use)]
 
 #![allow(clippy::new_without_default)]
 #![warn(clippy::todo)]
@@ -39,7 +39,7 @@ pub mod prelude {
 }
 
 use crate::prelude::*;
-use std::mem;
+use std::{mem, thread};
 use winit::{
 	application::ApplicationHandler,
 	dpi::PhysicalSize,
@@ -166,7 +166,7 @@ impl<'a> ApplicationHandler for ProgramData<'a> {
 			},
 			
 			WindowEvent::Resized (new_size) => {
-				resize(&mut program_data.render_context, new_size).expect("Failed to resize the window");
+				resize(program_data, new_size).expect("Failed to resize the window");
 			}
 			
 			_ => (),
@@ -183,14 +183,16 @@ impl<'a> ApplicationHandler for ProgramData<'a> {
 
 
 
-pub fn resize(render_context: &mut wgpu_integration::RenderContextData, new_size: PhysicalSize<u32>) -> Result<()> {
+pub fn resize(program_data: &mut ProgramData, new_size: PhysicalSize<u32>) -> Result<()> {
 	if new_size.width == 0 {return Err(Error::msg("Width cannot be 0"));}
 	if new_size.height == 0 {return Err(Error::msg("Height cannot be 0"));}
+	let render_context = &mut program_data.render_context;
 	render_context.size = new_size;
 	render_context.aspect_ratio = new_size.width as f32 / new_size.height as f32;
 	render_context.surface_config.width = new_size.width;
 	render_context.surface_config.height = new_size.height;
 	render_context.drawable_surface.configure(&render_context.device, &render_context.surface_config);
+	program_data.uniform_datas.depth_texture = wgpu_integration::create_depth_texture("depth_texture", render_context);
 	Ok(())
 }
 
@@ -203,13 +205,14 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 	let dt = program_data.step_dt();
 	update::update(program_data, dt)?;
 	
-	let render_result = render::render(program_data);
+	let output = program_data.render_context.drawable_surface.get_current_texture()?;
+	let render_result = render::render(&output, program_data);
 	if let Err(err) = render_result {
 		match err {
 			wgpu::SurfaceError::Lost => {
 				let size = program_data.render_context.size;
 				warn!("Swap chain lost, attempting to resize...");
-				resize(&mut program_data.render_context, size).context("Failed to resize window.")?;
+				resize(program_data, size).context("Failed to resize window.")?;
 			}
 			wgpu::SurfaceError::OutOfMemory => {
 				warn!("OutOfMemory error while rendering, exiting process.");
@@ -220,10 +223,19 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 		}
 	}
 	
+	let frame_time = frame_start_time.elapsed();
+	if frame_time < program_data.min_frame_time {
+		let sleep_time = program_data.min_frame_time - frame_time;
+		thread::sleep(sleep_time);
+	}
+	
 	let fps_counter_output = program_data.fps_counter.step(frame_start_time.elapsed());
 	if let Some((average_fps, average_frame_time)) = fps_counter_output {
 		log!("FPS: {average_fps}  (avg frame time: {average_frame_time:?})");
 	}
+	
+	program_data.window.pre_present_notify();
+	output.present();
 	
 	Ok(())
 }

@@ -13,7 +13,7 @@ pub fn update(program_data: &mut ProgramData, dt: f32) -> Result<()> {
 
 
 fn update_camera(program_data: &mut ProgramData, dt: f32) {
-	let speed = 10.0 * dt;
+	let speed = 100.0 * dt;
 	use cgmath::InnerSpace;
 	let forward = program_data.camera.target - program_data.camera.eye;
 	let forward_norm = forward.normalize();
@@ -32,10 +32,10 @@ fn update_camera(program_data: &mut ProgramData, dt: f32) {
 	let forward_mag = forward.magnitude();
 	
 	if program_data.key_is_down(KeyCode::KeyD) {
-		program_data.camera.eye = program_data.camera.target - (forward + right * speed).normalize() * forward_mag;
+		program_data.camera.eye = program_data.camera.target - (forward + right * speed * 0.3).normalize() * forward_mag;
 	}
 	if program_data.key_is_down(KeyCode::KeyA) {
-		program_data.camera.eye = program_data.camera.target - (forward - right * speed).normalize() * forward_mag;
+		program_data.camera.eye = program_data.camera.target - (forward - right * speed * 0.3).normalize() * forward_mag;
 	}
 	
 	let new_camera_data: [[f32; 4]; 4] = program_data.camera.build_view_projection_matrix(program_data.render_context.aspect_ratio).into();
