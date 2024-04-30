@@ -12,9 +12,9 @@ pub struct ProgramData<'a> {
 	pub min_frame_time: Duration,
 	
 	pub render_context: wgpu_integration::RenderContextData<'a>,
-	pub uniform_datas: UniformDatas,
-	pub asset_datas: AssetDatas,
-	pub world_datas: WorldDatas,
+	pub textures: Textures,
+	pub bindings: Bindings,
+	pub world_data: WorldData,
 	pub render_pipelines: RenderPipelines,
 	pub camera: Camera,
 	
@@ -39,16 +39,17 @@ impl<'a> ProgramData<'a> {
 
 
 
-pub struct UniformDatas {
-	pub camera_binding: wgpu_integration::GeneralBindData,
-	pub depth_texture: wgpu_integration::DepthTextureData,
+pub struct Textures {
+	pub depth: wgpu_integration::TextureData,
+	pub happy_tree: wgpu_integration::TextureData,
 }
 
-pub struct AssetDatas {
-	pub happy_tree_binding: wgpu_integration::TextureBindData,
+pub struct Bindings {
+	pub camera: wgpu_integration::GeneralBindData,
+	pub happy_tree: wgpu_integration::TextureBindData,
 }
 
-pub struct WorldDatas {
+pub struct WorldData {
 	
 	pub main_vertices: wgpu::Buffer,
 	pub main_indices: wgpu::Buffer,
@@ -74,11 +75,15 @@ pub struct RenderPipelines {
 pub struct GenericVertex {
 	pub position: [f32; 3],
 	pub tex_coords: [f32; 2],
+	pub normal: [f32; 3],
 }
 
 impl GenericVertex {
-	pub const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
-		wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2];
+	pub const ATTRIBUTES: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
+		0 => Float32x3,
+		1 => Float32x2,
+		2 => Float32x3,
+	];
 	pub const fn get_layout() -> wgpu::VertexBufferLayout<'static> {
 		wgpu::VertexBufferLayout {
 			array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
@@ -111,33 +116,18 @@ pub struct InstanceRaw {
 }
 
 impl InstanceRaw {
+	pub const ATTRIBUTES: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
+		5 => Float32x4,
+		6 => Float32x4,
+		7 => Float32x4,
+		8 => Float32x4
+	];
 	pub fn get_layout() -> wgpu::VertexBufferLayout<'static> {
 		use std::mem;
 		wgpu::VertexBufferLayout {
 			array_stride: mem::size_of::<InstanceRaw>() as wgpu::BufferAddress,
 			step_mode: wgpu::VertexStepMode::Instance,
-			attributes: &[
-				wgpu::VertexAttribute {
-					offset: 0,
-					shader_location: 5,
-					format: wgpu::VertexFormat::Float32x4,
-				},
-				wgpu::VertexAttribute {
-					offset: mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
-					shader_location: 6,
-					format: wgpu::VertexFormat::Float32x4,
-				},
-				wgpu::VertexAttribute {
-					offset: mem::size_of::<[f32; 8]>() as wgpu::BufferAddress,
-					shader_location: 7,
-					format: wgpu::VertexFormat::Float32x4,
-				},
-				wgpu::VertexAttribute {
-					offset: mem::size_of::<[f32; 12]>() as wgpu::BufferAddress,
-					shader_location: 8,
-					format: wgpu::VertexFormat::Float32x4,
-				},
-			],
+			attributes: &Self::ATTRIBUTES,
 		}
 	}
 }
@@ -145,11 +135,11 @@ impl InstanceRaw {
 
 
 pub const VERTICES: &[GenericVertex] = &[
-	GenericVertex { position: [-0.0868241, 0.49240386, 0.0], tex_coords: [0.4131759, 0.00759614], },
-	GenericVertex { position: [-0.49513406, 0.06958647, 0.0], tex_coords: [0.0048659444, 0.43041354], },
-	GenericVertex { position: [-0.21918549, -0.44939706, 0.0], tex_coords: [0.28081453, 0.949397], },
-	GenericVertex { position: [0.35966998, -0.3473291, 0.0], tex_coords: [0.85967, 0.84732914], },
-	GenericVertex { position: [0.44147372, 0.2347359, 0.0], tex_coords: [0.9414737, 0.2652641], },
+	GenericVertex { position: [-0.0868241, 0.49240386, 0.0], tex_coords: [0.4131759, 0.00759614], normal: [0.0, 0.0, 0.0] },
+	GenericVertex { position: [-0.49513406, 0.06958647, 0.0], tex_coords: [0.0048659444, 0.43041354], normal: [0.0, 0.0, 0.0] },
+	GenericVertex { position: [-0.21918549, -0.44939706, 0.0], tex_coords: [0.28081453, 0.949397], normal: [0.0, 0.0, 0.0] },
+	GenericVertex { position: [0.35966998, -0.3473291, 0.0], tex_coords: [0.85967, 0.84732914], normal: [0.0, 0.0, 0.0] },
+	GenericVertex { position: [0.44147372, 0.2347359, 0.0], tex_coords: [0.9414737, 0.2652641], normal: [0.0, 0.0, 0.0] },
 ];
 
 pub const INDICES: &[u16] = &[
@@ -157,6 +147,27 @@ pub const INDICES: &[u16] = &[
 	1, 2, 4,
 	2, 3, 4,
 ];
+
+
+
+pub struct Model {
+	pub meshes: Vec<Mesh>,
+	pub materials: Vec<Material>,
+}
+
+pub struct Mesh {
+    pub name: String,
+    pub vertex_buffer: wgpu::Buffer,
+    pub index_buffer: wgpu::Buffer,
+    pub num_elements: u32,
+    pub material: usize,
+}
+
+pub struct Material {
+    pub name: String,
+    pub diffuse_texture: wgpu_integration::TextureData,
+    pub bind_group: wgpu::BindGroup,
+}
 
 
 

@@ -1,20 +1,24 @@
+use std::{fmt::Debug, io::{BufReader, Cursor}};
+
 use crate::prelude::*;
-use serde_hjson::{Map, Value};
+use serde_hjson::{builder::ObjectBuilder, Map, Value};
 use wgpu::util::DeviceExt;
 use cgmath::prelude::*;
 
+use self::wgpu_integration::load_texture;
 
 
-pub fn init_program_data(start_time: Instant, window: &Window) -> Result<ProgramData> {
+
+pub fn init_program_data<'a>(start_time: Instant, window: &'a Window) -> Result<ProgramData<'a>> {
 	
 	let engine_config = load_engine_config()?;
 	
 	let camera = Camera::new((0., 1., 2.));
 	let render_context = wgpu_integration::init_wgpu_context_data(window, &engine_config)?;
-	let uniform_datas = load_uniform_datas(&render_context)?;
-	let asset_datas = load_asset_datas(&render_context)?;
-	let world_datas = load_world_datas(&render_context)?;
-	let render_pipelines = load_pipelines(&render_context, &uniform_datas, &asset_datas)?;
+	let textures = load_textures(&render_context)?;
+	let bindings = load_bindings(&render_context, &textures)?;
+	let world_data = load_world_data(&render_context)?;
+	let render_pipelines = load_pipelines(&render_context, &bindings)?;
 	
 	Ok(ProgramData {
 		
@@ -25,9 +29,9 @@ pub fn init_program_data(start_time: Instant, window: &Window) -> Result<Program
 		
 		render_context,
 		render_pipelines,
-		uniform_datas,
-		asset_datas,
-		world_datas,
+		bindings,
+		textures,
+		world_data,
 		camera,
 		
 		start_time,
@@ -66,7 +70,7 @@ pub fn load_engine_config() -> Result<EngineConfig> {
 		"metal" => wgpu::Backends::METAL,
 		"opengl" => wgpu::Backends::GL,
 		_ => {
-			log!("Unknown value for entry 'rendering_backend' in 'engine config.hjson', must be: 'auto', 'vulkan', 'dx12', 'metal', or 'opengl', defaulting to \"auto\".");
+			warn!("Unknown value for entry 'rendering_backend' in 'engine config.hjson', must be: 'auto', 'vulkan', 'dx12', 'metal', or 'opengl', defaulting to \"auto\".");
 			wgpu::Backends::all()
 		}
 	};
@@ -80,7 +84,7 @@ pub fn load_engine_config() -> Result<EngineConfig> {
 		"immediate" => wgpu::PresentMode::Immediate,
 		"mailbox" => wgpu::PresentMode::Mailbox,
 		_ => {
-			log!("Unknown value for entry 'present_mode' in 'engine config.hjson', must be: 'auto_vsync', 'auto_no_vsync', 'fifo', 'fifo_relaxed', 'immediate', or 'mailbox', defaulting to \"auto_vsync\".");
+			warn!("Unknown value for entry 'present_mode' in 'engine config.hjson', must be: 'auto_vsync', 'auto_no_vsync', 'fifo', 'fifo_relaxed', 'immediate', or 'mailbox', defaulting to \"auto_vsync\".");
 			wgpu::PresentMode::AutoVsync
 		}
 	};
@@ -102,11 +106,11 @@ pub fn load_engine_config() -> Result<EngineConfig> {
 pub fn read_hjson_str<'a>(map: &'a Map<String, Value>, key: &'static str, default: &'static str) -> &'a str {
 	let value_str = map.get(key);
 	let value_str = value_str.map(|v| v.as_str().unwrap_or_else(|| {
-		log!("Entry '{key}' in 'engine config.hjson' must be a string, defaulting to \"{default}\".");
+		warn!("Entry '{key}' in 'engine config.hjson' must be a string, defaulting to \"{default}\".");
 		default
 	}));
 	value_str.unwrap_or_else(|| {
-		log!("Could not find entry '{key}' in 'engine config.hjson', defaulting to \"{default}\".");
+		warn!("Could not find entry '{key}' in 'engine config.hjson', defaulting to \"{default}\".");
 		default
 	})
 }
@@ -114,11 +118,11 @@ pub fn read_hjson_str<'a>(map: &'a Map<String, Value>, key: &'static str, defaul
 pub fn read_hjson_i64(map: &Map<String, Value>, key: &'static str, default: i64) -> i64 {
 	let value_str = map.get(key);
 	let value_i64 = value_str.map(|v| v.as_i64().unwrap_or_else(|| {
-		log!("Entry '{key}' in 'engine config.hjson' must be an int, defaulting to \"{default}\".");
+		warn!("Entry '{key}' in 'engine config.hjson' must be an int, defaulting to \"{default}\".");
 		default
 	}));
 	value_i64.unwrap_or_else(|| {
-		log!("Could not find entry '{key}' in 'engine config.hjson', defaulting to \"{default}\".");
+		warn!("Could not find entry '{key}' in 'engine config.hjson', defaulting to \"{default}\".");
 		default
 	})
 }
@@ -126,18 +130,18 @@ pub fn read_hjson_i64(map: &Map<String, Value>, key: &'static str, default: i64)
 pub fn read_hjson_f64(map: &Map<String, Value>, key: &'static str, default: f64) -> f64 {
 	let value_str = map.get(key);
 	let value_f64 = value_str.map(|v| v.as_f64().unwrap_or_else(|| {
-		log!("Entry '{key}' in 'engine config.hjson' must be an int, defaulting to \"{default}\".");
+		warn!("Entry '{key}' in 'engine config.hjson' must be an int, defaulting to \"{default}\".");
 		default
 	}));
 	value_f64.unwrap_or_else(|| {
-		log!("Could not find entry '{key}' in 'engine config.hjson', defaulting to \"{default}\".");
+		warn!("Could not find entry '{key}' in 'engine config.hjson', defaulting to \"{default}\".");
 		default
 	})
 }
 
 
 
-pub fn load_uniform_datas(render_context: &wgpu_integration::RenderContextData) -> Result<UniformDatas> {
+pub fn load_bindings(render_context: &wgpu_integration::RenderContextData, textures: &Textures) -> Result<Bindings> {
 	
 	let initial_data = Camera::default_data();
 	let camera_buffer = render_context.device.create_buffer_init(
@@ -175,32 +179,75 @@ pub fn load_uniform_datas(render_context: &wgpu_integration::RenderContextData) 
 		label: Some("camera_bind_group"),
 	});
 	
-	let depth_texture = wgpu_integration::create_depth_texture("depth_texture", render_context);
+	let happy_tree_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+		entries: &[
+			wgpu::BindGroupLayoutEntry {
+				binding: 0,
+				visibility: wgpu::ShaderStages::FRAGMENT,
+				ty: wgpu::BindingType::Texture {
+					multisampled: false,
+					view_dimension: wgpu::TextureViewDimension::D2,
+					sample_type: wgpu::TextureSampleType::Float { filterable: true },
+				},
+				count: None,
+			},
+			wgpu::BindGroupLayoutEntry {
+				binding: 1,
+				visibility: wgpu::ShaderStages::FRAGMENT,
+				ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+				count: None,
+			},
+		],
+		label: Some("texture_bind_group_layout"),
+	});
 	
-	Ok(UniformDatas {
-		camera_binding: wgpu_integration::GeneralBindData {
+	let happy_tree_group = render_context.device.create_bind_group(
+		&wgpu::BindGroupDescriptor {
+			layout: &happy_tree_layout,
+			entries: &[
+				wgpu::BindGroupEntry {
+					binding: 0,
+					resource: wgpu::BindingResource::TextureView(&textures.happy_tree.view),
+				},
+				wgpu::BindGroupEntry {
+					binding: 1,
+					resource: wgpu::BindingResource::Sampler(&textures.happy_tree.sampler),
+				}
+			],
+			label: Some("diffuse_bind_group"),
+		}
+	);
+	
+	Ok(Bindings {
+		camera: wgpu_integration::GeneralBindData {
 			buffer: camera_buffer,
 			layout: camera_bind_group_layout,
 			group: camera_bind_group,
 		},
-		depth_texture,
+		happy_tree: wgpu_integration::TextureBindData {
+			group: happy_tree_group,
+			layout: happy_tree_layout,
+		}
 	})
 }
 
 
 
-pub fn load_asset_datas(render_context: &wgpu_integration::RenderContextData) -> Result<AssetDatas> {
+pub fn load_textures(render_context: &wgpu_integration::RenderContextData) -> Result<Textures> {
 	
-	let happy_tree_binding = wgpu_integration::load_texture("assets/happy-tree.png", render_context)?;
+	let depth = wgpu_integration::create_depth_texture("depth_texture", render_context);
 	
-	Ok(AssetDatas {
-		happy_tree_binding,
+	let happy_tree = wgpu_integration::load_texture("assets/happy-tree.png", render_context)?;
+	
+	Ok(Textures {
+		depth,
+		happy_tree,
 	})
 }
 
 
 
-pub fn load_world_datas(render_context: &wgpu_integration::RenderContextData) -> Result<WorldDatas> {
+pub fn load_world_data(render_context: &wgpu_integration::RenderContextData) -> Result<WorldData> {
 	
 	let vertex_buffer = render_context.device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
@@ -222,8 +269,6 @@ pub fn load_world_datas(render_context: &wgpu_integration::RenderContextData) ->
 			let position = cgmath::Vector3 { x: x as f32, y: 0.0, z: z as f32 } - cgmath::Vector3::new(0.5, 0.0, 0.5);
 			
 			let rotation = if position.is_zero() {
-				// this is needed so an object at (0, 0, 0) won't get scaled to zero
-				// as Quaternions can affect scale if they're not created correctly
 				cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
 			} else {
 				cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
@@ -245,7 +290,7 @@ pub fn load_world_datas(render_context: &wgpu_integration::RenderContextData) ->
 		}
 	);
 	
-	Ok(WorldDatas {
+	Ok(WorldData {
 		
 		main_vertices: vertex_buffer,
 		main_indices: index_buffer,
@@ -259,15 +304,15 @@ pub fn load_world_datas(render_context: &wgpu_integration::RenderContextData) ->
 
 
 
-pub fn load_pipelines(render_context: &wgpu_integration::RenderContextData, uniform_datas: &UniformDatas, asset_datas: &AssetDatas) -> Result<RenderPipelines> {
+pub fn load_pipelines(render_context: &wgpu_integration::RenderContextData, bindings: &Bindings) -> Result<RenderPipelines> {
 	
 	// main pipeline
 	let main = wgpu_integration::init_wgpu_pipeline(
 		"Main",
 		utils::get_program_file_path("shaders/main.wgsl"),
 		&[
-			&uniform_datas.camera_binding.layout,
-			&asset_datas.happy_tree_binding.layout,
+			&bindings.camera.layout,
+			&bindings.happy_tree.layout,
 		],
 		&[
 			GenericVertex::get_layout(),

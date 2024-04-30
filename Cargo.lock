@@ -2518,6 +2518,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tobj"
+version = "4.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3bd4ba05f29e4c65b6c0c11a58b6465ffa820bac890d76ad407b4e81d8372e8"
+dependencies = [
+ "ahash",
+]
+
+[[package]]
 name = "toml"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2978,6 +2987,7 @@ dependencies = [
  "log",
  "serde 1.0.199",
  "serde-hjson",
+ "tobj",
  "wgpu",
  "winit",
 ]

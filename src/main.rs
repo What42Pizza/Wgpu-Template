@@ -1,5 +1,5 @@
 // started:      24/04/18
-// last updated: 24/04/29
+// last updated: 24/04/30
 
 
 
@@ -34,12 +34,12 @@ pub mod prelude {
 		time::{Duration, Instant}
 	};
 	pub use std::result::Result as StdResult;
-	//pub use log::{info, warn};
+	pub use log::{info, warn, debug};
 	pub use anyhow::*;
 }
 
 use crate::prelude::*;
-use std::{mem, thread};
+use std::{env, mem, thread};
 use winit::{
 	application::ApplicationHandler,
 	dpi::PhysicalSize,
@@ -54,12 +54,16 @@ use winit::{
 
 fn main() -> Result<()> {
 	let start_time = Instant::now();
+	
+	if env::var("RUST_LOG").is_err() {
+		env::set_var("RUST_LOG", "warn");
+	}
 	env_logger::init();
 	
 	let mut event_loop = EventLoop::new()?;
 	let mut init_data = InitData::default();
 	
-	log!("Running initialization event_loop...");
+	info!("Running initialization event_loop...");
 	let window = loop {
 		event_loop.pump_app_events(None, &mut init_data);
 		if let Some(window) = mem::take(&mut init_data.window) {
@@ -67,11 +71,10 @@ fn main() -> Result<()> {
 		}
 	};
 	
-	log!("Done, starting main event_loop...");
+	info!("Done, starting main event_loop...");
 	let mut program_data = load::init_program_data(start_time, &window)?;
 	event_loop.run_app(&mut program_data)?;
 	
-	log!(>flush);
 	Ok(())
 }
 
@@ -85,9 +88,6 @@ pub struct InitData {
 }
 
 impl ApplicationHandler for InitData {
-	//fn new_events(&mut self, _event_loop: &ActiveEventLoop, cause: StartCause) {
-	//	log!("new_events: {cause:?}");
-	//}
 	
 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
 		if self.window.is_none() {
@@ -120,9 +120,6 @@ impl ApplicationHandler for InitData {
 
 
 impl<'a> ApplicationHandler for ProgramData<'a> {
-	//fn new_events(&mut self, _event_loop: &ActiveEventLoop, cause: StartCause) {
-	//	log!("new_events: {cause:?}");
-	//}
 	
 	
 	
@@ -160,7 +157,7 @@ impl<'a> ApplicationHandler for ProgramData<'a> {
 			WindowEvent::RedrawRequested => {
 				let result = redraw_requested(program_data, event_loop);
 				if let Err(err) = result {
-					log!("Fatal error while processing frame: {err}");
+					info!("Fatal error while processing frame: {err}");
 					event_loop.exit();
 				}
 			},
@@ -179,6 +176,7 @@ impl<'a> ApplicationHandler for ProgramData<'a> {
 		let program_data = self;
 		program_data.window.request_redraw();
 	}
+	
 }
 
 
@@ -192,7 +190,7 @@ pub fn resize(program_data: &mut ProgramData, new_size: PhysicalSize<u32>) -> Re
 	render_context.surface_config.width = new_size.width;
 	render_context.surface_config.height = new_size.height;
 	render_context.drawable_surface.configure(&render_context.device, &render_context.surface_config);
-	program_data.uniform_datas.depth_texture = wgpu_integration::create_depth_texture("depth_texture", render_context);
+	program_data.textures.depth = wgpu_integration::create_depth_texture("depth_texture", render_context);
 	Ok(())
 }
 
@@ -231,7 +229,7 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 	
 	let fps_counter_output = program_data.fps_counter.step(frame_start_time.elapsed());
 	if let Some((average_fps, average_frame_time)) = fps_counter_output {
-		log!("FPS: {average_fps}  (avg frame time: {average_frame_time:?})");
+		info!("FPS: {average_fps}  (avg frame time: {average_frame_time:?})");
 	}
 	
 	program_data.window.pre_present_notify();

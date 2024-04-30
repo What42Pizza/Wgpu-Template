@@ -40,7 +40,7 @@ fn update_camera(program_data: &mut ProgramData, dt: f32) {
 	
 	let new_camera_data: [[f32; 4]; 4] = program_data.camera.build_view_projection_matrix(program_data.render_context.aspect_ratio).into();
 	program_data.render_context.command_queue.write_buffer(
-		&program_data.uniform_datas.camera_binding.buffer,
+		&program_data.bindings.camera.buffer,
 		0,
 		bytemuck::cast_slice(&[new_camera_data]),
 	);

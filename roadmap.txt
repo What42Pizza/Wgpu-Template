@@ -6,9 +6,11 @@ post-processing
 	color correction
 	bloom
 	taa
+gui system
+text rendering
 
 for later projects:
 terrain generation
 tree generation
 player movement
-collision system?
+physics for player, vehicles, etc

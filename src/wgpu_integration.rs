@@ -17,12 +17,7 @@ pub struct RenderContextData<'a> {
 
 
 
-pub struct TextureBindData {
-	pub group: wgpu::BindGroup,
-	pub layout: wgpu::BindGroupLayout,
-}
-
-pub struct DepthTextureData {
+pub struct TextureData {
 	pub texture: wgpu::Texture,
 	pub view: wgpu::TextureView,
 	pub sampler: wgpu::Sampler,
@@ -30,6 +25,11 @@ pub struct DepthTextureData {
 
 pub struct GeneralBindData {
 	pub buffer: wgpu::Buffer,
+	pub group: wgpu::BindGroup,
+	pub layout: wgpu::BindGroupLayout,
+}
+
+pub struct TextureBindData {
 	pub group: wgpu::BindGroup,
 	pub layout: wgpu::BindGroupLayout,
 }
@@ -182,7 +182,7 @@ pub fn init_wgpu_pipeline(
 
 
 
-pub fn load_texture(path: impl AsRef<Path>, render_context: &RenderContextData) -> Result<TextureBindData> {
+pub fn load_texture(path: impl AsRef<Path>, render_context: &RenderContextData) -> Result<TextureData> {
 	
 	let raw_texture_bytes = fs::read(utils::get_program_file_path(path))?;
 	let texture_bytes = image::load_from_memory(&raw_texture_bytes)?;
@@ -232,7 +232,7 @@ pub fn load_texture(path: impl AsRef<Path>, render_context: &RenderContextData) 
 		texture_size,
 	);
 	
-	let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+	let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 	let sampler = render_context.device.create_sampler(&wgpu::SamplerDescriptor {
 		address_mode_u: wgpu::AddressMode::ClampToEdge,
 		address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -243,54 +243,16 @@ pub fn load_texture(path: impl AsRef<Path>, render_context: &RenderContextData) 
 		..Default::default()
 	});
 	
-	let bind_group_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-		entries: &[
-			wgpu::BindGroupLayoutEntry {
-				binding: 0,
-				visibility: wgpu::ShaderStages::FRAGMENT,
-				ty: wgpu::BindingType::Texture {
-					multisampled: false,
-					view_dimension: wgpu::TextureViewDimension::D2,
-					sample_type: wgpu::TextureSampleType::Float { filterable: true },
-				},
-				count: None,
-			},
-			wgpu::BindGroupLayoutEntry {
-				binding: 1,
-				visibility: wgpu::ShaderStages::FRAGMENT,
-				ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-				count: None,
-			},
-		],
-		label: Some("texture_bind_group_layout"),
-	});
-	
-	let bind_group = render_context.device.create_bind_group(
-		&wgpu::BindGroupDescriptor {
-			layout: &bind_group_layout,
-			entries: &[
-				wgpu::BindGroupEntry {
-					binding: 0,
-					resource: wgpu::BindingResource::TextureView(&texture_view),
-				},
-				wgpu::BindGroupEntry {
-					binding: 1,
-					resource: wgpu::BindingResource::Sampler(&sampler),
-				}
-			],
-			label: Some("diffuse_bind_group"),
-		}
-	);
-	
-	Ok(TextureBindData {
-		group: bind_group,
-		layout: bind_group_layout,
+	Ok(TextureData {
+		texture,
+		view,
+		sampler,
 	})
 }
 
 
 
-pub fn create_depth_texture(label: &str, render_context: &RenderContextData) -> DepthTextureData {
+pub fn create_depth_texture(label: &str, render_context: &RenderContextData) -> TextureData {
 	
 	let size = wgpu::Extent3d {
 		width: render_context.surface_config.width,
@@ -325,9 +287,9 @@ pub fn create_depth_texture(label: &str, render_context: &RenderContextData) -> 
 		}
 	);
 	
-	DepthTextureData {
+	TextureData {
 		texture,
 		view,
-		sampler
+		sampler,
 	}
 }
