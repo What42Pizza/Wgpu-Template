@@ -9,6 +9,7 @@
 		"multiview",
 		"OPENGL",
 		"repr",
+		"texcoords",
 		"tobj",
 		"Unorm",
 		"wgsl"

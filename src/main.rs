@@ -190,7 +190,7 @@ pub fn resize(program_data: &mut ProgramData, new_size: PhysicalSize<u32>) -> Re
 	render_context.surface_config.width = new_size.width;
 	render_context.surface_config.height = new_size.height;
 	render_context.drawable_surface.configure(&render_context.device, &render_context.surface_config);
-	program_data.textures.depth = wgpu_integration::create_depth_texture("depth_texture", render_context);
+	program_data.assets.depth = wgpu_integration::create_depth_texture("depth_texture", render_context);
 	Ok(())
 }
 

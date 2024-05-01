@@ -1,5 +1,7 @@
 use crate::prelude::*;
+use std::io::{BufReader, Cursor};
 use async_std::task::block_on;
+use wgpu::util::DeviceExt;
 use winit::window::Window;
 
 
@@ -23,16 +25,16 @@ pub struct TextureData {
 	pub sampler: wgpu::Sampler,
 }
 
-pub struct GeneralBindData {
-	pub buffer: wgpu::Buffer,
-	pub group: wgpu::BindGroup,
-	pub layout: wgpu::BindGroupLayout,
-}
+//pub struct GeneralBindData {
+//	pub buffer: wgpu::Buffer,
+//	pub group: wgpu::BindGroup,
+//	pub layout: wgpu::BindGroupLayout,
+//}
 
-pub struct TextureBindData {
-	pub group: wgpu::BindGroup,
-	pub layout: wgpu::BindGroupLayout,
-}
+//pub struct TextureBindData {
+//	pub group: wgpu::BindGroup,
+//	pub layout: wgpu::BindGroupLayout,
+//}
 
 
 
@@ -292,4 +294,109 @@ pub fn create_depth_texture(label: &str, render_context: &RenderContextData) -> 
 		view,
 		sampler,
 	}
+}
+
+
+
+
+
+pub fn load_model<'a>(
+	name: String,
+	file_path: impl AsRef<Path>,
+	render_context: &RenderContextData<'a>,
+	layout: &wgpu::BindGroupLayout,
+) -> Result<Model> {
+	let file_path = file_path.as_ref();
+	let obj_text = fs::read_to_string(&file_path)?;
+	let obj_cursor = Cursor::new(obj_text);
+	let mut obj_reader = BufReader::new(obj_cursor);
+	let parent_path = file_path.parent().expect("Cannot load mesh at root directory");
+	
+	let (models, obj_materials) = tobj::load_obj_buf(
+		&mut obj_reader,
+		&tobj::LoadOptions {
+			triangulate: true,
+			single_index: true,
+			..Default::default()
+		},
+		move |p| {
+			let mat_text = fs::read_to_string(parent_path.join(p)).map_err(|_err| tobj::LoadError::OpenFileFailed)?;
+			tobj::load_mtl_buf(&mut BufReader::new(Cursor::new(mat_text)))
+		}
+	)?;
+	let obj_materials = obj_materials?;
+	
+	let mut materials = Vec::new();
+	for material in obj_materials {
+		let Some(diffuse_texture_path) = material.diffuse_texture.as_ref() else {
+			warn!("diffuse texture in material is `None`.");
+			continue;
+		};
+		let diffuse_texture = load_texture(parent_path.join(diffuse_texture_path), render_context)?;
+		let bind_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
+			layout,
+			entries: &[
+				wgpu::BindGroupEntry {
+					binding: 0,
+					resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
+				},
+				wgpu::BindGroupEntry {
+					binding: 1,
+					resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
+				},
+			],
+			label: None,
+		});
+		
+		materials.push(Material {
+			name: material.name,
+			diffuse_texture,
+			bind_group,
+		})
+	}
+	
+	let meshes = models
+		.into_iter()
+		.map(|m| {
+			let vertices = (0..m.mesh.positions.len() / 3)
+				.map(|i| GenericVertex {
+					position: [
+						m.mesh.positions[i * 3],
+						m.mesh.positions[i * 3 + 1],
+						m.mesh.positions[i * 3 + 2],
+					],
+					tex_coords: [m.mesh.texcoords[i * 2], 1.0 - m.mesh.texcoords[i * 2 + 1]],
+					normal: [
+						m.mesh.normals[i * 3],
+						m.mesh.normals[i * 3 + 1],
+						m.mesh.normals[i * 3 + 2],
+					],
+				})
+				.collect::<Vec<_>>();
+			
+			let vertex_buffer = render_context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+				label: Some(&format!("{:?} Vertex Buffer", &file_path)),
+				contents: bytemuck::cast_slice(&vertices),
+				usage: wgpu::BufferUsages::VERTEX,
+			});
+			let index_buffer = render_context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+				label: Some(&format!("{:?} Index Buffer", &file_path)),
+				contents: bytemuck::cast_slice(&m.mesh.indices),
+				usage: wgpu::BufferUsages::INDEX,
+			});
+			
+			Mesh {
+				name: name.clone(),
+				vertex_buffer,
+				index_buffer,
+				num_elements: m.mesh.indices.len() as u32,
+				material: m.mesh.material_id.unwrap_or(0),
+			}
+		})
+		.collect::<Vec<_>>();
+	
+	Ok(Model {
+		meshes,
+		materials
+	})
 }

@@ -2,15 +2,10 @@ use crate::prelude::*;
 
 
 
-pub fn get_program_dir() -> PathBuf {
-	let mut output = std::env::current_exe().expect("Could not retrieve the path for the current exe.");
-	output.pop();
-	output
-}
-
 #[cfg(debug_assertions)]
 pub fn get_program_file_path(input: impl AsRef<Path>) -> PathBuf {
-	let mut output = get_program_dir();
+	let mut output = std::env::current_exe().expect("Could not retrieve the path for the current exe.");
+	output.pop();
 	output.pop();
 	output.pop();
 	output.join("data").join(input)

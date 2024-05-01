@@ -1,24 +1,22 @@
-use std::{fmt::Debug, io::{BufReader, Cursor}};
-
 use crate::prelude::*;
+use std::{fmt::Debug, io::{BufReader, Cursor}};
 use serde_hjson::{builder::ObjectBuilder, Map, Value};
 use wgpu::util::DeviceExt;
 use cgmath::prelude::*;
 
-use self::wgpu_integration::load_texture;
 
 
-
-pub fn init_program_data<'a>(start_time: Instant, window: &'a Window) -> Result<ProgramData<'a>> {
+pub fn init_program_data(start_time: Instant, window: &Window) -> Result<ProgramData> {
 	
 	let engine_config = load_engine_config()?;
 	
 	let camera = Camera::new((0., 1., 2.));
 	let render_context = wgpu_integration::init_wgpu_context_data(window, &engine_config)?;
-	let textures = load_textures(&render_context)?;
-	let bindings = load_bindings(&render_context, &textures)?;
+	let layouts = load_layouts(&render_context)?;
+	let assets = load_assets(&render_context, &layouts)?;
+	let bindings = load_bindings(&render_context, &layouts, &assets)?;
 	let world_data = load_world_data(&render_context)?;
-	let render_pipelines = load_pipelines(&render_context, &bindings)?;
+	let render_pipelines = load_pipelines(&render_context, &layouts)?;
 	
 	Ok(ProgramData {
 		
@@ -29,8 +27,9 @@ pub fn init_program_data<'a>(start_time: Instant, window: &'a Window) -> Result<
 		
 		render_context,
 		render_pipelines,
+		layouts,
+		assets,
 		bindings,
-		textures,
 		world_data,
 		camera,
 		
@@ -141,18 +140,11 @@ pub fn read_hjson_f64(map: &Map<String, Value>, key: &'static str, default: f64)
 
 
 
-pub fn load_bindings(render_context: &wgpu_integration::RenderContextData, textures: &Textures) -> Result<Bindings> {
+
+
+pub fn load_layouts(render_context: &wgpu_integration::RenderContextData) -> Result<Layouts> {
 	
-	let initial_data = Camera::default_data();
-	let camera_buffer = render_context.device.create_buffer_init(
-		&wgpu::util::BufferInitDescriptor {
-			label: Some("Camera Buffer"),
-			contents: bytemuck::cast_slice(&[initial_data]),
-			usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-		}
-	);
-	
-	let camera_bind_group_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+	let camera_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 		entries: &[
 			wgpu::BindGroupLayoutEntry {
 				binding: 0,
@@ -168,18 +160,7 @@ pub fn load_bindings(render_context: &wgpu_integration::RenderContextData, textu
 		label: Some("camera_bind_group_layout"),
 	});
 	
-	let camera_bind_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
-		layout: &camera_bind_group_layout,
-		entries: &[
-			wgpu::BindGroupEntry {
-				binding: 0,
-				resource: camera_buffer.as_entire_binding(),
-			}
-		],
-		label: Some("camera_bind_group"),
-	});
-	
-	let happy_tree_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+	let texture_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 		entries: &[
 			wgpu::BindGroupLayoutEntry {
 				binding: 0,
@@ -201,17 +182,49 @@ pub fn load_bindings(render_context: &wgpu_integration::RenderContextData, textu
 		label: Some("texture_bind_group_layout"),
 	});
 	
+	Ok(Layouts {
+		camera: camera_layout,
+		texture: texture_layout,
+	})
+}
+
+
+
+
+
+pub fn load_bindings(render_context: &wgpu_integration::RenderContextData, layouts: &Layouts, assets: &Assets) -> Result<Bindings> {
+	
+	let initial_data = Camera::default_data();
+	let camera_buffer = render_context.device.create_buffer_init(
+		&wgpu::util::BufferInitDescriptor {
+			label: Some("Camera Buffer"),
+			contents: bytemuck::cast_slice(&[initial_data]),
+			usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+		}
+	);
+	
+	let camera_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
+		layout: &layouts.camera,
+		entries: &[
+			wgpu::BindGroupEntry {
+				binding: 0,
+				resource: camera_buffer.as_entire_binding(),
+			}
+		],
+		label: Some("camera_bind_group"),
+	});
+	
 	let happy_tree_group = render_context.device.create_bind_group(
 		&wgpu::BindGroupDescriptor {
-			layout: &happy_tree_layout,
+			layout: &layouts.texture,
 			entries: &[
 				wgpu::BindGroupEntry {
 					binding: 0,
-					resource: wgpu::BindingResource::TextureView(&textures.happy_tree.view),
+					resource: wgpu::BindingResource::TextureView(&assets.happy_tree.view),
 				},
 				wgpu::BindGroupEntry {
 					binding: 1,
-					resource: wgpu::BindingResource::Sampler(&textures.happy_tree.sampler),
+					resource: wgpu::BindingResource::Sampler(&assets.happy_tree.sampler),
 				}
 			],
 			label: Some("diffuse_bind_group"),
@@ -219,29 +232,29 @@ pub fn load_bindings(render_context: &wgpu_integration::RenderContextData, textu
 	);
 	
 	Ok(Bindings {
-		camera: wgpu_integration::GeneralBindData {
-			buffer: camera_buffer,
-			layout: camera_bind_group_layout,
-			group: camera_bind_group,
-		},
-		happy_tree: wgpu_integration::TextureBindData {
-			group: happy_tree_group,
-			layout: happy_tree_layout,
-		}
+		
+		camera_buffer,
+		camera_group,
+		
+		happy_tree_group,
+		
 	})
 }
 
 
 
-pub fn load_textures(render_context: &wgpu_integration::RenderContextData) -> Result<Textures> {
+pub fn load_assets(render_context: &wgpu_integration::RenderContextData, layouts: &Layouts) -> Result<Assets> {
 	
 	let depth = wgpu_integration::create_depth_texture("depth_texture", render_context);
 	
 	let happy_tree = wgpu_integration::load_texture("assets/happy-tree.png", render_context)?;
 	
-	Ok(Textures {
+	let test_model = wgpu_integration::load_model(String::from("Test Cube"), utils::get_program_file_path("assets/cube.obj"), render_context, &layouts.texture)?;
+	
+	Ok(Assets {
 		depth,
 		happy_tree,
+		test_model,
 	})
 }
 
@@ -266,7 +279,7 @@ pub fn load_world_data(render_context: &wgpu_integration::RenderContextData) -> 
 	
 	let main_instances = (0..100).flat_map(|z| {
 		(0..100).map(move |x| {
-			let position = cgmath::Vector3 { x: x as f32, y: 0.0, z: z as f32 } - cgmath::Vector3::new(0.5, 0.0, 0.5);
+			let position = cgmath::Vector3 { x: x as f32 * 3.0, y: 0.0, z: z as f32 * 3.0 } - cgmath::Vector3::new(0.5, 0.0, 0.5);
 			
 			let rotation = if position.is_zero() {
 				cgmath::Quaternion::from_axis_angle(cgmath::Vector3::unit_z(), cgmath::Deg(0.0))
@@ -304,15 +317,15 @@ pub fn load_world_data(render_context: &wgpu_integration::RenderContextData) -> 
 
 
 
-pub fn load_pipelines(render_context: &wgpu_integration::RenderContextData, bindings: &Bindings) -> Result<RenderPipelines> {
+pub fn load_pipelines(render_context: &wgpu_integration::RenderContextData, layouts: &Layouts) -> Result<RenderPipelines> {
 	
 	// main pipeline
 	let main = wgpu_integration::init_wgpu_pipeline(
 		"Main",
 		utils::get_program_file_path("shaders/main.wgsl"),
 		&[
-			&bindings.camera.layout,
-			&bindings.happy_tree.layout,
+			&layouts.camera,
+			&layouts.texture,
 		],
 		&[
 			GenericVertex::get_layout(),

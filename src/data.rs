@@ -12,7 +12,8 @@ pub struct ProgramData<'a> {
 	pub min_frame_time: Duration,
 	
 	pub render_context: wgpu_integration::RenderContextData<'a>,
-	pub textures: Textures,
+	pub layouts: Layouts,
+	pub assets: Assets,
 	pub bindings: Bindings,
 	pub world_data: WorldData,
 	pub render_pipelines: RenderPipelines,
@@ -39,14 +40,24 @@ impl<'a> ProgramData<'a> {
 
 
 
-pub struct Textures {
+pub struct Layouts {
+	pub camera: wgpu::BindGroupLayout,
+	pub texture: wgpu::BindGroupLayout,
+}
+
+pub struct Assets {
 	pub depth: wgpu_integration::TextureData,
 	pub happy_tree: wgpu_integration::TextureData,
+	pub test_model: Model,
 }
 
 pub struct Bindings {
-	pub camera: wgpu_integration::GeneralBindData,
-	pub happy_tree: wgpu_integration::TextureBindData,
+	
+	pub camera_buffer: wgpu::Buffer,
+	pub camera_group: wgpu::BindGroup,
+	
+	pub happy_tree_group: wgpu::BindGroup,
+	
 }
 
 pub struct WorldData {
