@@ -1,4 +1,4 @@
-model loading
+better texture management
 skybox
 shadows
 water

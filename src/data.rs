@@ -12,11 +12,11 @@ pub struct ProgramData<'a> {
 	pub min_frame_time: Duration,
 	
 	pub render_context: wgpu_integration::RenderContextData<'a>,
-	pub layouts: Layouts,
-	pub assets: Assets,
-	pub bindings: Bindings,
-	pub world_data: WorldData,
-	pub render_pipelines: RenderPipelines,
+	pub texture_layout: wgpu::BindGroupLayout,
+	pub depth_render_data: DepthRenderData,
+	pub camera_render_data: CameraRenderData,
+	pub test_model_render_data: ModelRenderData,
+	pub test_render_pipeline: wgpu::RenderPipeline,
 	pub camera: Camera,
 	
 	pub start_time: Instant,
@@ -40,44 +40,48 @@ impl<'a> ProgramData<'a> {
 
 
 
-pub struct Layouts {
-	pub camera: wgpu::BindGroupLayout,
-	pub texture: wgpu::BindGroupLayout,
+pub struct DepthRenderData {
+	pub texture: wgpu::Texture,
+	pub view: wgpu::TextureView,
+	pub sampler: wgpu::Sampler,
 }
 
-pub struct Assets {
-	pub depth: wgpu_integration::TextureData,
-	pub happy_tree: wgpu_integration::TextureData,
-	pub test_model: Model,
+pub struct CameraRenderData {
+	pub buffer: wgpu::Buffer,
+	pub bind_layout: wgpu::BindGroupLayout,
+	pub bind_group: wgpu::BindGroup,
 }
 
-pub struct Bindings {
-	
-	pub camera_buffer: wgpu::Buffer,
-	pub camera_group: wgpu::BindGroup,
-	
-	pub happy_tree_group: wgpu::BindGroup,
-	
+pub struct ModelRenderData {
+	pub instances_buffer: wgpu::Buffer,
+	pub instances_count: u32,
+	pub meshes: Vec<MeshRenderData>,
+	pub materials: Vec<MaterialRenderData>,
 }
 
-pub struct WorldData {
-	
-	pub main_vertices: wgpu::Buffer,
-	pub main_indices: wgpu::Buffer,
-	pub main_index_count: u32,
-	
-	pub main_instances: Vec<Instance>,
-	pub main_instances_buffer: wgpu::Buffer,
-	
+pub struct MeshRenderData {
+	pub vertex_buffer: wgpu::Buffer,
+	pub index_buffer: wgpu::Buffer,
+	pub index_count: u32,
+	pub material_index: usize,
 }
 
-
-
-pub struct RenderPipelines {
-	pub main: wgpu::RenderPipeline,
+pub struct MaterialRenderData {
+	pub texture: wgpu::Texture,
+	pub view: wgpu::TextureView,
+	pub sampler: wgpu::Sampler,
+	pub bind_group: wgpu::BindGroup,
 }
 
 
+
+
+
+pub struct TextureData {
+	pub texture: wgpu::Texture,
+	pub view: wgpu::TextureView,
+	pub sampler: wgpu::Sampler,
+}
 
 
 
@@ -158,27 +162,6 @@ pub const INDICES: &[u16] = &[
 	1, 2, 4,
 	2, 3, 4,
 ];
-
-
-
-pub struct Model {
-	pub meshes: Vec<Mesh>,
-	pub materials: Vec<Material>,
-}
-
-pub struct Mesh {
-    pub name: String,
-    pub vertex_buffer: wgpu::Buffer,
-    pub index_buffer: wgpu::Buffer,
-    pub num_elements: u32,
-    pub material: usize,
-}
-
-pub struct Material {
-    pub name: String,
-    pub diffuse_texture: wgpu_integration::TextureData,
-    pub bind_group: wgpu::BindGroup,
-}
 
 
 

@@ -19,25 +19,6 @@ pub struct RenderContextData<'a> {
 
 
 
-pub struct TextureData {
-	pub texture: wgpu::Texture,
-	pub view: wgpu::TextureView,
-	pub sampler: wgpu::Sampler,
-}
-
-//pub struct GeneralBindData {
-//	pub buffer: wgpu::Buffer,
-//	pub group: wgpu::BindGroup,
-//	pub layout: wgpu::BindGroupLayout,
-//}
-
-//pub struct TextureBindData {
-//	pub group: wgpu::BindGroup,
-//	pub layout: wgpu::BindGroupLayout,
-//}
-
-
-
 
 
 pub fn init_wgpu_context_data<'a>(window: &'a Window, engine_config: &load::EngineConfig) -> Result<RenderContextData<'a>> {
@@ -203,17 +184,8 @@ pub fn load_texture(path: impl AsRef<Path>, render_context: &RenderContextData) 
 			sample_count: 1,
 			dimension: wgpu::TextureDimension::D2,
 			format: wgpu::TextureFormat::Rgba8UnormSrgb,
-			// TEXTURE_BINDING tells wgpu that we want to use this texture in shaders
-			// COPY_DST means that we want to copy data to this texture
 			usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
 			label: Some("Diffuse Texture"),
-			// This is the same as with the SurfaceConfig. It
-			// specifies what texture formats can be used to
-			// create TextureViews for this texture. The base
-			// texture format (Rgba8UnormSrgb in this case) is
-			// always supported. Note that using a different
-			// texture format is not supported on the WebGL2
-			// backend.
 			view_formats: &[],
 		}
 	);
@@ -254,60 +226,15 @@ pub fn load_texture(path: impl AsRef<Path>, render_context: &RenderContextData) 
 
 
 
-pub fn create_depth_texture(label: &str, render_context: &RenderContextData) -> TextureData {
-	
-	let size = wgpu::Extent3d {
-		width: render_context.surface_config.width,
-		height: render_context.surface_config.height,
-		depth_or_array_layers: 1,
-	};
-	let desc = wgpu::TextureDescriptor {
-		label: Some(label),
-		size,
-		mip_level_count: 1,
-		sample_count: 1,
-		dimension: wgpu::TextureDimension::D2,
-		format: wgpu::TextureFormat::Depth32Float,
-		usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
-		view_formats: &[],
-	};
-	let texture = render_context.device.create_texture(&desc);
-	
-	let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-	let sampler = render_context.device.create_sampler(
-		&wgpu::SamplerDescriptor {
-			address_mode_u: wgpu::AddressMode::ClampToEdge,
-			address_mode_v: wgpu::AddressMode::ClampToEdge,
-			address_mode_w: wgpu::AddressMode::ClampToEdge,
-			mag_filter: wgpu::FilterMode::Linear,
-			min_filter: wgpu::FilterMode::Linear,
-			mipmap_filter: wgpu::FilterMode::Nearest,
-			compare: Some(wgpu::CompareFunction::LessEqual),
-			lod_min_clamp: 0.0,
-			lod_max_clamp: 100.0,
-			..Default::default()
-		}
-	);
-	
-	TextureData {
-		texture,
-		view,
-		sampler,
-	}
-}
 
 
-
-
-
-pub fn load_model<'a>(
-	name: String,
+pub fn load_model(
 	file_path: impl AsRef<Path>,
-	render_context: &RenderContextData<'a>,
+	render_context: &RenderContextData,
 	layout: &wgpu::BindGroupLayout,
-) -> Result<Model> {
+) -> Result<(Vec<MeshRenderData>, Vec<MaterialRenderData>)> {
 	let file_path = file_path.as_ref();
-	let obj_text = fs::read_to_string(&file_path)?;
+	let obj_text = fs::read_to_string(file_path)?;
 	let obj_cursor = Cursor::new(obj_text);
 	let mut obj_reader = BufReader::new(obj_cursor);
 	let parent_path = file_path.parent().expect("Cannot load mesh at root directory");
@@ -332,44 +259,45 @@ pub fn load_model<'a>(
 			warn!("diffuse texture in material is `None`.");
 			continue;
 		};
-		let diffuse_texture = load_texture(parent_path.join(diffuse_texture_path), render_context)?;
+		let texture = load_texture(parent_path.join(diffuse_texture_path), render_context)?;
 		let bind_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
 			layout,
 			entries: &[
 				wgpu::BindGroupEntry {
 					binding: 0,
-					resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
+					resource: wgpu::BindingResource::TextureView(&texture.view),
 				},
 				wgpu::BindGroupEntry {
 					binding: 1,
-					resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
+					resource: wgpu::BindingResource::Sampler(&texture.sampler),
 				},
 			],
 			label: None,
 		});
 		
-		materials.push(Material {
-			name: material.name,
-			diffuse_texture,
+		materials.push(MaterialRenderData {
+			texture: texture.texture,
+			view: texture.view,
+			sampler: texture.sampler,
 			bind_group,
 		})
 	}
 	
 	let meshes = models
 		.into_iter()
-		.map(|m| {
-			let vertices = (0..m.mesh.positions.len() / 3)
+		.map(|model| {
+			let vertices = (0..model.mesh.positions.len() / 3)
 				.map(|i| GenericVertex {
 					position: [
-						m.mesh.positions[i * 3],
-						m.mesh.positions[i * 3 + 1],
-						m.mesh.positions[i * 3 + 2],
+						model.mesh.positions[i * 3],
+						model.mesh.positions[i * 3 + 1],
+						model.mesh.positions[i * 3 + 2],
 					],
-					tex_coords: [m.mesh.texcoords[i * 2], 1.0 - m.mesh.texcoords[i * 2 + 1]],
+					tex_coords: [model.mesh.texcoords[i * 2], 1.0 - model.mesh.texcoords[i * 2 + 1]],
 					normal: [
-						m.mesh.normals[i * 3],
-						m.mesh.normals[i * 3 + 1],
-						m.mesh.normals[i * 3 + 2],
+						model.mesh.normals[i * 3],
+						model.mesh.normals[i * 3 + 1],
+						model.mesh.normals[i * 3 + 2],
 					],
 				})
 				.collect::<Vec<_>>();
@@ -381,22 +309,21 @@ pub fn load_model<'a>(
 			});
 			let index_buffer = render_context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
 				label: Some(&format!("{:?} Index Buffer", &file_path)),
-				contents: bytemuck::cast_slice(&m.mesh.indices),
+				contents: bytemuck::cast_slice(&model.mesh.indices),
 				usage: wgpu::BufferUsages::INDEX,
 			});
 			
-			Mesh {
-				name: name.clone(),
+			MeshRenderData {
 				vertex_buffer,
 				index_buffer,
-				num_elements: m.mesh.indices.len() as u32,
-				material: m.mesh.material_id.unwrap_or(0),
+				index_count: model.mesh.indices.len() as u32,
+				material_index: model.mesh.material_id.unwrap_or(0),
 			}
 		})
 		.collect::<Vec<_>>();
 	
-	Ok(Model {
+	Ok((
 		meshes,
-		materials
-	})
+		materials,
+	))
 }

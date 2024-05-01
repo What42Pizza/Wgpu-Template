@@ -1,7 +1,6 @@
 use crate::prelude::*;
-use std::{fmt::Debug, io::{BufReader, Cursor}};
-use serde_hjson::{builder::ObjectBuilder, Map, Value};
-use wgpu::util::DeviceExt;
+use serde_hjson::{Map, Value};
+use wgpu::{util::DeviceExt, BindGroupLayout};
 use cgmath::prelude::*;
 
 
@@ -12,11 +11,46 @@ pub fn init_program_data(start_time: Instant, window: &Window) -> Result<Program
 	
 	let camera = Camera::new((0., 1., 2.));
 	let render_context = wgpu_integration::init_wgpu_context_data(window, &engine_config)?;
-	let layouts = load_layouts(&render_context)?;
-	let assets = load_assets(&render_context, &layouts)?;
-	let bindings = load_bindings(&render_context, &layouts, &assets)?;
-	let world_data = load_world_data(&render_context)?;
-	let render_pipelines = load_pipelines(&render_context, &layouts)?;
+	
+	let texture_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+		entries: &[
+			wgpu::BindGroupLayoutEntry {
+				binding: 0,
+				visibility: wgpu::ShaderStages::FRAGMENT,
+				ty: wgpu::BindingType::Texture {
+					multisampled: false,
+					view_dimension: wgpu::TextureViewDimension::D2,
+					sample_type: wgpu::TextureSampleType::Float { filterable: true },
+				},
+				count: None,
+			},
+			wgpu::BindGroupLayoutEntry {
+				binding: 1,
+				visibility: wgpu::ShaderStages::FRAGMENT,
+				ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+				count: None,
+			},
+		],
+		label: Some("texture_bind_group_layout"),
+	});
+	
+	let depth_render_data = load_depth_render_data(&render_context)?;
+	let camera_render_data = load_camera_render_data(&render_context)?;
+	let test_model_render_data = load_test_model_render_data(&render_context, &texture_layout)?;
+	
+	let test_render_pipeline = wgpu_integration::init_wgpu_pipeline(
+		"Main",
+		utils::get_program_file_path("shaders/main.wgsl"),
+		&[
+			&camera_render_data.bind_layout,
+			&texture_layout,
+		],
+		&[
+			GenericVertex::get_layout(),
+			InstanceRaw::get_layout()
+		],
+		&render_context,
+	)?;
 	
 	Ok(ProgramData {
 		
@@ -26,11 +60,11 @@ pub fn init_program_data(start_time: Instant, window: &Window) -> Result<Program
 		min_frame_time: engine_config.min_frame_time,
 		
 		render_context,
-		render_pipelines,
-		layouts,
-		assets,
-		bindings,
-		world_data,
+		texture_layout,
+		depth_render_data,
+		camera_render_data,
+		test_model_render_data,
+		test_render_pipeline,
 		camera,
 		
 		start_time,
@@ -142,9 +176,55 @@ pub fn read_hjson_f64(map: &Map<String, Value>, key: &'static str, default: f64)
 
 
 
-pub fn load_layouts(render_context: &wgpu_integration::RenderContextData) -> Result<Layouts> {
+pub fn load_depth_render_data(render_context: &wgpu_integration::RenderContextData) -> Result<DepthRenderData> {
 	
-	let camera_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+	let size = wgpu::Extent3d {
+		width: render_context.surface_config.width,
+		height: render_context.surface_config.height,
+		depth_or_array_layers: 1,
+	};
+	let desc = wgpu::TextureDescriptor {
+		label: Some("Depth Texture"),
+		size,
+		mip_level_count: 1,
+		sample_count: 1,
+		dimension: wgpu::TextureDimension::D2,
+		format: wgpu::TextureFormat::Depth32Float,
+		usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+		view_formats: &[],
+	};
+	let texture = render_context.device.create_texture(&desc);
+	
+	let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+	let sampler = render_context.device.create_sampler(
+		&wgpu::SamplerDescriptor {
+			address_mode_u: wgpu::AddressMode::ClampToEdge,
+			address_mode_v: wgpu::AddressMode::ClampToEdge,
+			address_mode_w: wgpu::AddressMode::ClampToEdge,
+			mag_filter: wgpu::FilterMode::Linear,
+			min_filter: wgpu::FilterMode::Linear,
+			mipmap_filter: wgpu::FilterMode::Nearest,
+			compare: Some(wgpu::CompareFunction::LessEqual),
+			lod_min_clamp: 0.0,
+			lod_max_clamp: 100.0,
+			..Default::default()
+		}
+	);
+	
+	Ok(DepthRenderData {
+		texture,
+		view,
+		sampler,
+	})
+}
+
+
+
+
+
+pub fn load_camera_render_data(render_context: &wgpu_integration::RenderContextData) -> Result<CameraRenderData> {
+	
+	let bind_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 		entries: &[
 			wgpu::BindGroupLayoutEntry {
 				binding: 0,
@@ -160,42 +240,8 @@ pub fn load_layouts(render_context: &wgpu_integration::RenderContextData) -> Res
 		label: Some("camera_bind_group_layout"),
 	});
 	
-	let texture_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-		entries: &[
-			wgpu::BindGroupLayoutEntry {
-				binding: 0,
-				visibility: wgpu::ShaderStages::FRAGMENT,
-				ty: wgpu::BindingType::Texture {
-					multisampled: false,
-					view_dimension: wgpu::TextureViewDimension::D2,
-					sample_type: wgpu::TextureSampleType::Float { filterable: true },
-				},
-				count: None,
-			},
-			wgpu::BindGroupLayoutEntry {
-				binding: 1,
-				visibility: wgpu::ShaderStages::FRAGMENT,
-				ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-				count: None,
-			},
-		],
-		label: Some("texture_bind_group_layout"),
-	});
-	
-	Ok(Layouts {
-		camera: camera_layout,
-		texture: texture_layout,
-	})
-}
-
-
-
-
-
-pub fn load_bindings(render_context: &wgpu_integration::RenderContextData, layouts: &Layouts, assets: &Assets) -> Result<Bindings> {
-	
 	let initial_data = Camera::default_data();
-	let camera_buffer = render_context.device.create_buffer_init(
+	let buffer = render_context.device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
 			label: Some("Camera Buffer"),
 			contents: bytemuck::cast_slice(&[initial_data]),
@@ -203,81 +249,33 @@ pub fn load_bindings(render_context: &wgpu_integration::RenderContextData, layou
 		}
 	);
 	
-	let camera_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
-		layout: &layouts.camera,
+	let bind_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
+		layout: &bind_layout,
 		entries: &[
 			wgpu::BindGroupEntry {
 				binding: 0,
-				resource: camera_buffer.as_entire_binding(),
+				resource: buffer.as_entire_binding(),
 			}
 		],
 		label: Some("camera_bind_group"),
 	});
 	
-	let happy_tree_group = render_context.device.create_bind_group(
-		&wgpu::BindGroupDescriptor {
-			layout: &layouts.texture,
-			entries: &[
-				wgpu::BindGroupEntry {
-					binding: 0,
-					resource: wgpu::BindingResource::TextureView(&assets.happy_tree.view),
-				},
-				wgpu::BindGroupEntry {
-					binding: 1,
-					resource: wgpu::BindingResource::Sampler(&assets.happy_tree.sampler),
-				}
-			],
-			label: Some("diffuse_bind_group"),
-		}
-	);
-	
-	Ok(Bindings {
-		
-		camera_buffer,
-		camera_group,
-		
-		happy_tree_group,
-		
+	Ok(CameraRenderData {
+		buffer,
+		bind_layout,
+		bind_group,
 	})
 }
 
 
 
-pub fn load_assets(render_context: &wgpu_integration::RenderContextData, layouts: &Layouts) -> Result<Assets> {
-	
-	let depth = wgpu_integration::create_depth_texture("depth_texture", render_context);
-	
-	let happy_tree = wgpu_integration::load_texture("assets/happy-tree.png", render_context)?;
-	
-	let test_model = wgpu_integration::load_model(String::from("Test Cube"), utils::get_program_file_path("assets/cube.obj"), render_context, &layouts.texture)?;
-	
-	Ok(Assets {
-		depth,
-		happy_tree,
-		test_model,
-	})
-}
 
 
-
-pub fn load_world_data(render_context: &wgpu_integration::RenderContextData) -> Result<WorldData> {
+pub fn load_test_model_render_data(render_context: &wgpu_integration::RenderContextData, texture_layout: &BindGroupLayout) -> Result<ModelRenderData> {
 	
-	let vertex_buffer = render_context.device.create_buffer_init(
-		&wgpu::util::BufferInitDescriptor {
-			label: Some("Vertex Buffer"),
-			contents: bytemuck::cast_slice(VERTICES),
-			usage: wgpu::BufferUsages::VERTEX,
-		}
-	);
-	let index_buffer = render_context.device.create_buffer_init(
-		&wgpu::util::BufferInitDescriptor {
-			label: Some("Index Buffer"),
-			contents: bytemuck::cast_slice(INDICES),
-			usage: wgpu::BufferUsages::INDEX,
-		}
-	);
+	let (test_model_meshes, test_model_materials) = wgpu_integration::load_model(utils::get_program_file_path("assets/cube.obj"), render_context, texture_layout)?;
 	
-	let main_instances = (0..100).flat_map(|z| {
+	let test_model_instances = (0..100).flat_map(|z| {
 		(0..100).map(move |x| {
 			let position = cgmath::Vector3 { x: x as f32 * 3.0, y: 0.0, z: z as f32 * 3.0 } - cgmath::Vector3::new(0.5, 0.0, 0.5);
 			
@@ -294,47 +292,19 @@ pub fn load_world_data(render_context: &wgpu_integration::RenderContextData) -> 
 		})
 	}).collect::<Vec<_>>();
 	
-	let main_instances_data = main_instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
-	let main_instances_buffer = render_context.device.create_buffer_init(
+	let test_model_instances_data = test_model_instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+	let test_model_instances_buffer = render_context.device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
 			label: Some("Instance Buffer"),
-			contents: bytemuck::cast_slice(&main_instances_data),
+			contents: bytemuck::cast_slice(&test_model_instances_data),
 			usage: wgpu::BufferUsages::VERTEX,
 		}
 	);
 	
-	Ok(WorldData {
-		
-		main_vertices: vertex_buffer,
-		main_indices: index_buffer,
-		main_index_count: INDICES.len() as u32,
-		
-		main_instances,
-		main_instances_buffer,
-		
-	})
-}
-
-
-
-pub fn load_pipelines(render_context: &wgpu_integration::RenderContextData, layouts: &Layouts) -> Result<RenderPipelines> {
-	
-	// main pipeline
-	let main = wgpu_integration::init_wgpu_pipeline(
-		"Main",
-		utils::get_program_file_path("shaders/main.wgsl"),
-		&[
-			&layouts.camera,
-			&layouts.texture,
-		],
-		&[
-			GenericVertex::get_layout(),
-			InstanceRaw::get_layout()
-		],
-		render_context,
-	)?;
-	
-	Ok(RenderPipelines {
-		main
+	Ok(ModelRenderData {
+		instances_buffer: test_model_instances_buffer,
+		instances_count: test_model_instances.len() as u32,
+		meshes: test_model_meshes,
+		materials: test_model_materials,
 	})
 }

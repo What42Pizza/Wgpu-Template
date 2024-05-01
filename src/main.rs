@@ -1,5 +1,8 @@
-// started:      24/04/18
-// last updated: 24/04/30
+// Started:      24/04/18
+// Last updated: 24/04/30
+
+// Learn Wgpu website: https://sotrh.github.io/learn-wgpu/
+// Learn Wgpu repo: https://github.com/sotrh/learn-wgpu
 
 
 
@@ -190,7 +193,7 @@ pub fn resize(program_data: &mut ProgramData, new_size: PhysicalSize<u32>) -> Re
 	render_context.surface_config.width = new_size.width;
 	render_context.surface_config.height = new_size.height;
 	render_context.drawable_surface.configure(&render_context.device, &render_context.surface_config);
-	program_data.assets.depth = wgpu_integration::create_depth_texture("depth_texture", render_context);
+	program_data.depth_render_data = load::load_depth_render_data(render_context)?;
 	Ok(())
 }
 

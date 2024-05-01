@@ -24,7 +24,7 @@ pub fn render(output: &wgpu::SurfaceTexture, program_data: &mut ProgramData) -> 
 			},
 		})],
 		depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-			view: &program_data.assets.depth.view,
+			view: &program_data.depth_render_data.view,
 			depth_ops: Some(wgpu::Operations {
 				load: wgpu::LoadOp::Clear(1.0),
 				store: wgpu::StoreOp::Store,
@@ -34,15 +34,15 @@ pub fn render(output: &wgpu::SurfaceTexture, program_data: &mut ProgramData) -> 
 		occlusion_query_set: None,
 		timestamp_writes: None,
 	});
-	main_pass_handle.set_pipeline(&program_data.render_pipelines.main);
-	main_pass_handle.set_bind_group(0, &program_data.bindings.camera_group, &[]);
-	main_pass_handle.set_bind_group(1, &program_data.bindings.happy_tree_group, &[]);
+	main_pass_handle.set_pipeline(&program_data.test_render_pipeline);
+	main_pass_handle.set_bind_group(0, &program_data.camera_render_data.bind_group, &[]);
+	main_pass_handle.set_bind_group(1, &program_data.test_model_render_data.materials[0].bind_group, &[]);
 	//main_pass_handle.set_vertex_buffer(0, program_data.world_data.main_vertices.slice(..));
 	//main_pass_handle.set_vertex_buffer(1, program_data.world_data.main_instances_buffer.slice(..));
 	//main_pass_handle.set_index_buffer(program_data.world_data.main_indices.slice(..), wgpu::IndexFormat::Uint16);
 	//main_pass_handle.draw_indexed(0..program_data.world_data.main_index_count, 0, 0..program_data.world_data.main_instances.len() as u32);
-	main_pass_handle.set_vertex_buffer(1, program_data.world_data.main_instances_buffer.slice(..));
-	draw_mesh_instanced(&mut main_pass_handle, &program_data.assets.test_model.meshes[0], 0..program_data.world_data.main_instances.len() as u32);
+	main_pass_handle.set_vertex_buffer(1, program_data.test_model_render_data.instances_buffer.slice(..));
+	draw_mesh_instanced(&mut main_pass_handle, &program_data.test_model_render_data.meshes[0], 0..program_data.test_model_render_data.instances_count);
 	drop(main_pass_handle);
 	
 	program_data.render_context.command_queue.submit(std::iter::once(encoder.finish()));
@@ -54,12 +54,12 @@ pub fn render(output: &wgpu::SurfaceTexture, program_data: &mut ProgramData) -> 
 
 fn draw_mesh_instanced<'a, 'b> (
 	render_pass: &mut wgpu::RenderPass<'a>,
-	mesh: &'b Mesh,
+	mesh: &'b MeshRenderData,
 	instances: Range<u32>,
 ) where
 	'b: 'a
 {
 	render_pass.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
 	render_pass.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-	render_pass.draw_indexed(0..mesh.num_elements, 0, instances);
+	render_pass.draw_indexed(0..mesh.index_count, 0, instances);
 }
