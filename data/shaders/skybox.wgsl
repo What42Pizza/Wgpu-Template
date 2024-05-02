@@ -1,51 +1,51 @@
-@group(0) @binding(0) var<uniform> view_proj_mat: mat4x4<f32>;
+@group(0) @binding(0) var<uniform> camera_data: CameraData;
 
-struct VertexInput {
-	@location(0) position: vec3<f32>,
-	@location(1) tex_coords: vec2<f32>,
+struct CameraData {
+	proj_view_mat: mat4x4<f32>,
+	inv_proj_mat: mat4x4<f32>,
+	view_mat: mat4x4<f32>,
 }
-
-struct InstanceInput {
-	@location(5) model_matrix_0: vec4<f32>,
-	@location(6) model_matrix_1: vec4<f32>,
-	@location(7) model_matrix_2: vec4<f32>,
-	@location(8) model_matrix_3: vec4<f32>,
-};
 
 
 
 @vertex
 fn vs_main(
-	model: VertexInput,
-	instance: InstanceInput,
+	@builtin(vertex_index) index: u32
 ) -> VertexOutput {
 	
-	let model_matrix = mat4x4<f32>(
-		instance.model_matrix_0,
-		instance.model_matrix_1,
-		instance.model_matrix_2,
-		instance.model_matrix_3,
+	// hacky way to draw a single large triangle that convers the entire screen
+	let pos = vec4<f32>(
+		f32(i32(index) / 2) * 4.0 - 1.0,
+		f32(i32(index) & 1) * 4.0 - 1.0,
+		1.0,
+		1.0
 	);
+	let inv_view_mat = transpose(mat3x3<f32>(camera_data.view_mat[0].xyz, camera_data.view_mat[1].xyz, camera_data.view_mat[2].xyz));
+	
+	let camera_pos = camera_data.inv_proj_mat * pos;
+	let world_pos = inv_view_mat * camera_pos.xyz;
 	
 	var out: VertexOutput;
-	out.tex_coords = model.tex_coords;
-	out.clip_position = view_proj_mat * model_matrix * vec4<f32>(model.position, 1.0);
+	out.texcoords = world_pos;
+	out.pos = pos;
+	out.pos.z = out.pos.z * 0.5 + 0.25;
 	return out;
 }
 
 
 
 struct VertexOutput {
-	@builtin(position) clip_position: vec4<f32>,
-	@location(0) tex_coords: vec2<f32>,
+	@builtin(position) pos: vec4<f32>,
+	@location(0) texcoords: vec3<f32>,
 };
 
-@group(1) @binding(0) var happy_tree_texture: texture_cube<f32>;
-@group(1) @binding(1) var happy_tree_sampler: sampler;
+@group(1) @binding(0) var skybox_texture: texture_cube<f32>;
+@group(1) @binding(1) var skybox_sampler: sampler;
 
 
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-	return textureSample(happy_tree_texture, happy_tree_sampler, vec3<f32>(in.tex_coords, 0.0));
+	return textureSample(skybox_texture, skybox_sampler, in.texcoords);
+	//return vec4<f32>(1.0, 0.0, 0.0, 1.0);
 }

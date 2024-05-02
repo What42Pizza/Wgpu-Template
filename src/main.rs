@@ -1,8 +1,9 @@
 // Started:      24/04/18
-// Last updated: 24/05/01
+// Last updated: 24/05/02
 
 // Learn Wgpu website: https://sotrh.github.io/learn-wgpu/
 // Learn Wgpu repo: https://github.com/sotrh/learn-wgpu
+// Skybox source: https://opengameart.org/content/clouds-skybox-1
 
 
 
@@ -24,8 +25,8 @@
 pub mod load;
 pub mod update;
 pub mod render;
-pub mod wgpu_integration;
 pub mod data;
+pub mod materials_storage_utils;
 pub mod utils;
 
 pub mod prelude {

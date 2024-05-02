@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use cgmath::SquareMatrix;
 use winit::keyboard::KeyCode;
 
 
@@ -13,8 +12,8 @@ pub struct ProgramData<'a> {
 	pub min_frame_time: Duration,
 	pub fps_counter: FpsCounter,
 	
-	pub render_context: wgpu_integration::RenderContextData<'a>,
-	pub render_layouts: TextureLayouts,
+	pub render_context: RenderContextData<'a>,
+	pub render_layouts: TextureBindLayouts,
 	pub render_assets: RenderAssets,
 	pub render_pipelines: RenderPipelines,
 	
@@ -38,7 +37,18 @@ impl<'a> ProgramData<'a> {
 
 
 
-pub struct TextureLayouts {
+pub struct RenderContextData<'a> {
+	pub drawable_surface: wgpu::Surface<'a>,
+	pub device: wgpu::Device,
+	pub command_queue: wgpu::Queue,
+	pub surface_config: wgpu::SurfaceConfiguration,
+	pub size: winit::dpi::PhysicalSize<u32>,
+	pub aspect_ratio: f32,
+}
+
+
+
+pub struct TextureBindLayouts {
 	pub generic: wgpu::BindGroupLayout,
 	pub cube: wgpu::BindGroupLayout,
 }
@@ -46,29 +56,30 @@ pub struct TextureLayouts {
 
 
 pub struct RenderAssets {
+	pub dummy_buffer: wgpu::Buffer,
 	pub materials_storage: MaterialsStorage,
-	pub test_model: ModelRenderData,
+	pub example_model: ModelRenderData,
+	pub skybox_material_index: usize,
 	pub depth: DepthRenderData,
 	pub camera: CameraRenderData,
 }
 
 pub struct MaterialsStorage {
-	pub list: Vec<MaterialRenderData>,
+	pub list_2d: Vec<MaterialRenderData>,
+	pub list_cube: Vec<MaterialRenderData>,
 }
 
 impl MaterialsStorage {
 	pub fn new() -> Self {
 		Self {
-			list: vec!(),
+			list_2d: vec!(),
+			list_cube: vec!(),
 		}
 	}
 }
 
 pub struct MaterialRenderData {
-	pub name: String,
-	//pub texture: wgpu::Texture,
-	//pub view: wgpu::TextureView,
-	//pub sampler: wgpu::Sampler,
+	pub path: PathBuf,
 	pub bind_group: wgpu::BindGroup,
 }
 
@@ -86,9 +97,7 @@ pub struct MeshRenderData {
 }
 
 pub struct DepthRenderData {
-	//pub texture: wgpu::Texture,
 	pub view: wgpu::TextureView,
-	//pub sampler: wgpu::Sampler,
 }
 
 pub struct CameraRenderData {
@@ -100,20 +109,11 @@ pub struct CameraRenderData {
 
 
 pub struct RenderPipelines {
-	pub test: wgpu::RenderPipeline,
+	pub example: wgpu::RenderPipeline,
 	pub skybox: wgpu::RenderPipeline,
 }
 
 
-
-
-
-pub struct TextureData {
-	pub texture: wgpu::Texture,
-	pub view: wgpu::TextureView,
-	pub sampler: wgpu::Sampler,
-	pub bind_group: wgpu::BindGroup
-}
 
 
 
@@ -143,15 +143,15 @@ impl GenericVertex {
 
 
 pub struct Instance {
-	pub position: cgmath::Vector3<f32>,
-	pub rotation: cgmath::Quaternion<f32>,
+	pub position: glam::Vec3,
+	pub rotation: glam::Quat,
 }
 
 impl Instance {
 	pub fn to_raw(&self) -> InstanceRaw {
-		let model_data = cgmath::Matrix4::from_translation(self.position) * cgmath::Matrix4::from(self.rotation);
+		let model_data = glam::Mat4::from_translation(self.position) * glam::Mat4::from_quat(self.rotation);
 		InstanceRaw {
-			model: model_data.into(),
+			model: model_data.to_cols_array_2d(),
 		}
 	}
 }
@@ -164,10 +164,10 @@ pub struct InstanceRaw {
 
 impl InstanceRaw {
 	pub const ATTRIBUTES: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
+		3 => Float32x4,
+		4 => Float32x4,
 		5 => Float32x4,
-		6 => Float32x4,
-		7 => Float32x4,
-		8 => Float32x4
+		6 => Float32x4
 	];
 	pub fn get_layout() -> wgpu::VertexBufferLayout<'static> {
 		use std::mem;
@@ -200,34 +200,40 @@ pub const INDICES: &[u16] = &[
 
 
 pub struct Camera {
-	pub eye: cgmath::Point3<f32>,
-	pub target: cgmath::Point3<f32>,
-	pub up: cgmath::Vector3<f32>,
+	pub eye: glam::Vec3,
+	pub target: glam::Vec3,
+	pub up: glam::Vec3,
 	pub fov: f32,
 	pub near: f32,
 	pub far: f32,
 }
 
 impl Camera {
-	pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
+	pub const OPENGL_TO_WGPU_MATRIX: glam::Mat4 = glam::Mat4::from_cols_array(&[
 		1.0, 0.0, 0.0, 0.0,
 		0.0, 1.0, 0.0, 0.0,
 		0.0, 0.0, 0.5, 0.5,
 		0.0, 0.0, 0.0, 1.0,
-	);	
-	pub fn build_view_projection_matrix(&self, aspect_ratio: f32) -> cgmath::Matrix4<f32> {
-		let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
-		let proj = cgmath::perspective(cgmath::Deg (self.fov), aspect_ratio, self.near, self.far);
-		Self::OPENGL_TO_WGPU_MATRIX * proj * view
+	]);
+	pub fn build_data(&self, aspect_ratio: f32) -> [f32; 16 + 16 +16] {
+        let proj = glam::Mat4::perspective_rh(self.fov, aspect_ratio, 1.0, 50.0);
+        let view = glam::Mat4::look_at_rh(self.eye, self.target, self.up);
+        let inv_proj = proj.inverse();
+		let proj_view = proj * view;
+		let mut output = [0f32; 16 + 16 + 16];
+		output[..16].copy_from_slice(&proj_view.to_cols_array());
+		output[16..32].copy_from_slice(&inv_proj.to_cols_array());
+		output[32..48].copy_from_slice(&view.to_cols_array());
+		output
 	}
-	pub fn default_data() -> [[f32; 4]; 4] {
-		cgmath::Matrix4::identity().into()
+	pub fn default_data() -> [f32; 16 + 16 + 16] {
+		[0.0; 16 + 16 + 16]
 	}
 	pub fn new(pos: (f32, f32, f32)) -> Self {
 		Self {
 			eye: pos.into(),
 			target: (0.0, 0.0, 0.0).into(),
-			up: cgmath::Vector3::unit_y(),
+			up: glam::Vec3::Y,
 			fov: 45.0,
 			near: 0.1,
 			far: 100.0,
