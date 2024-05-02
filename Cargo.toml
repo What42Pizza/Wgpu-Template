@@ -7,7 +7,6 @@ edition = "2021"
 anyhow = "1.0.82"
 async-std = "1.12.0"
 bytemuck = { version = "1.15.0", features = ["derive"] }
-#cgmath = "0.18.0"
 env_logger = "0.11.3"
 glam = "0.27.0"
 image = "0.25.1"

@@ -4,26 +4,18 @@ use wgpu::util::DeviceExt;
 
 
 
-pub fn load_render_assets(render_context: &RenderContextData, texture_bind_layouts: &TextureBindLayouts) -> Result<RenderAssets> {
+pub fn load_render_assets(render_context: &RenderContextData, generic_bind_layouts: &GenericBindLayouts) -> Result<RenderAssets> {
 	
-	let dummy_buffer = render_context.device.create_buffer_init(
-		&wgpu::util::BufferInitDescriptor {
-			label: Some("Dummy Buffer"),
-			contents: &[],
-			usage: wgpu::BufferUsages::VERTEX,
-		}
-	);
 	let mut materials_storage = MaterialsStorage::new();
-	let example_model = load_example_model_render_data(render_context, texture_bind_layouts, &mut materials_storage)?;
-	let skybox_material_index = load_skybox_material(render_context, texture_bind_layouts, &mut materials_storage)?;
+	let example_model = load_example_model_render_data(render_context, generic_bind_layouts, &mut materials_storage)?;
+	let skybox_material_index = load_skybox_material(render_context, generic_bind_layouts, &mut materials_storage)?;
 	let depth = load_depth_render_data(render_context)?;
 	let camera = load_camera_render_data(render_context)?;
 	
 	Ok(RenderAssets {
-		dummy_buffer,
 		materials_storage,
-		example_model,
-		skybox_material_index,
+		example_models: example_model,
+		skybox_material_id: skybox_material_index,
 		depth,
 		camera,
 	})
@@ -35,11 +27,11 @@ pub fn load_render_assets(render_context: &RenderContextData, texture_bind_layou
 
 pub fn load_example_model_render_data(
 	render_context: &RenderContextData,
-	texture_bind_layouts: &TextureBindLayouts,
+	generic_bind_layouts: &GenericBindLayouts,
 	materials_storage: &mut MaterialsStorage,
-) -> Result<ModelRenderData> {
+) -> Result<ModelsRenderData> {
 	
-	let example_model_meshes = load_model(utils::get_program_file_path("assets/cube.obj"), render_context, texture_bind_layouts, materials_storage)?;
+	let example_model_meshes = load_model(utils::get_program_file_path("assets/cube.obj"), render_context, generic_bind_layouts, materials_storage)?;
 	
 	let example_model_instances = (0..100).flat_map(|z| {
 		(0..100).map(move |x| {
@@ -51,14 +43,14 @@ pub fn load_example_model_render_data(
 				glam::Quat::from_axis_angle(position.normalize(), std::f32::consts::PI * 0.25)
 			};
 			
-			Instance {
+			InstanceData {
 				position,
 				rotation,
 			}
 		})
 	}).collect::<Vec<_>>();
 	
-	let example_model_instances_data = example_model_instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+	let example_model_instances_data = example_model_instances.iter().map(InstanceData::to_raw).collect::<Vec<_>>();
 	let example_model_instances_buffer = render_context.device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
 			label: Some("Instance Buffer"),
@@ -67,7 +59,7 @@ pub fn load_example_model_render_data(
 		}
 	);
 	
-	Ok(ModelRenderData {
+	Ok(ModelsRenderData {
 		instances_buffer: example_model_instances_buffer,
 		instances_count: example_model_instances.len() as u32,
 		meshes: example_model_meshes,
@@ -79,7 +71,7 @@ pub fn load_example_model_render_data(
 pub fn load_model(
 	file_path: impl AsRef<Path>,
 	render_context: &RenderContextData,
-	texture_bind_layouts: &TextureBindLayouts,
+	generic_bind_layouts: &GenericBindLayouts,
 	materials_storage: &mut MaterialsStorage,
 ) -> Result<Vec<MeshRenderData>> {
 	let file_path = file_path.as_ref();
@@ -109,9 +101,9 @@ pub fn load_model(
 			continue;
 		};
 		let path = parent_folder.join(&diffuse_texture_name);
-		let material_id = match materials_storage_utils::get_material_index(&path, &materials_storage.list_2d) {
+		let material_id = match materials_storage_utils::get_material_id(&path, &materials_storage.list_2d) {
 			Some(v) => v,
-			None => materials_storage_utils::insert_material_2d(path, materials_storage, render_context, &texture_bind_layouts.generic)?,
+			None => materials_storage_utils::insert_material_2d(path, materials_storage, render_context, generic_bind_layouts)?,
 		};
 		material_ids.push(material_id);
 	}
@@ -150,7 +142,7 @@ pub fn load_model(
 				vertex_buffer,
 				index_buffer,
 				index_count: model.mesh.indices.len() as u32,
-				material_index: material_ids[model.mesh.material_id.unwrap_or(0)],
+				material_id: material_ids[model.mesh.material_id.unwrap_or(0)],
 			}
 		})
 		.collect::<Vec<_>>();
@@ -160,8 +152,8 @@ pub fn load_model(
 
 
 
-pub fn load_skybox_material(render_context: &RenderContextData, texture_bind_layouts: &TextureBindLayouts, materials_storage: &mut MaterialsStorage) -> Result<usize> {
-	materials_storage_utils::insert_material_cube(utils::get_program_file_path("assets/skybox.png"), materials_storage, render_context, &texture_bind_layouts.cube)
+pub fn load_skybox_material(render_context: &RenderContextData, generic_bind_layouts: &GenericBindLayouts, materials_storage: &mut MaterialsStorage) -> Result<usize> {
+	materials_storage_utils::insert_material_cube(utils::get_program_file_path("assets/skybox.png"), materials_storage, render_context, generic_bind_layouts)
 }
 
 

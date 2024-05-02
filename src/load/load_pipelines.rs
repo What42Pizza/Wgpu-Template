@@ -2,10 +2,10 @@ use crate::prelude::*;
 
 
 
-pub fn load_render_pipelines(render_context: &RenderContextData, render_layouts: &TextureBindLayouts, render_assets: &RenderAssets) -> Result<RenderPipelines> {
+pub fn load_render_pipelines(render_context: &RenderContextData, generic_bind_layouts: &GenericBindLayouts, render_assets: &RenderAssets) -> Result<RenderPipelines> {
 	
-	let example = load_example_render_pipeline(&render_assets.camera.bind_layout, &render_layouts.generic, render_context)?;
-	let skybox = load_skybox_render_pipeline(&render_assets.camera.bind_layout, &render_layouts.cube, render_context)?;
+	let example = load_example_render_pipeline(&render_assets.camera.bind_layout, generic_bind_layouts, render_context)?;
+	let skybox = load_skybox_render_pipeline(&render_assets.camera.bind_layout, generic_bind_layouts, render_context)?;
 	
 	Ok(RenderPipelines {
 		example,
@@ -19,7 +19,7 @@ pub fn load_render_pipelines(render_context: &RenderContextData, render_layouts:
 
 pub fn load_example_render_pipeline(
 	camera_layout: &wgpu::BindGroupLayout,
-	texture_bind_layout: &wgpu::BindGroupLayout,
+	generic_bind_layouts: &GenericBindLayouts,
 	render_context: &RenderContextData,
 ) -> Result<wgpu::RenderPipeline> {
 	
@@ -33,7 +33,7 @@ pub fn load_example_render_pipeline(
 		label: Some("Example Render Pipeline"),
 		bind_group_layouts: &[
 			camera_layout,
-			texture_bind_layout,
+			&generic_bind_layouts.texture_2d,
 		],
 		push_constant_ranges: &[],
 	});
@@ -46,7 +46,7 @@ pub fn load_example_render_pipeline(
 			entry_point: "vs_main",
 			buffers: &[
 				GenericVertex::get_layout(),
-				InstanceRaw::get_layout()
+				RawInstanceData::get_layout()
 			],
 			compilation_options: wgpu::PipelineCompilationOptions::default(),
 		},
@@ -93,7 +93,7 @@ pub fn load_example_render_pipeline(
 
 pub fn load_skybox_render_pipeline(
 	camera_layout: &wgpu::BindGroupLayout,
-	cube_texture_bind_layout: &wgpu::BindGroupLayout,
+	generic_bind_layouts: &GenericBindLayouts,
 	render_context: &RenderContextData,
 ) -> Result<wgpu::RenderPipeline> {
 	
@@ -107,7 +107,7 @@ pub fn load_skybox_render_pipeline(
 		label: Some("Skybox Render Pipeline"),
 		bind_group_layouts: &[
 			camera_layout,
-			cube_texture_bind_layout,
+			&generic_bind_layouts.texture_cube,
 		],
 		push_constant_ranges: &[],
 	});

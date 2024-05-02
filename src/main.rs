@@ -38,7 +38,7 @@ pub mod prelude {
 		time::{Duration, Instant}
 	};
 	pub use std::result::Result as StdResult;
-	pub use log::{info, warn, debug};
+	pub use log::{info, warn, debug, error};
 	pub use anyhow::*;
 }
 
@@ -64,10 +64,15 @@ fn main() -> Result<()> {
 	}
 	env_logger::init();
 	
+	// There's kinda a catch-22 here where A: we need the window to be available before
+	// we create the application struct, B: we need the application struct in order to
+	// start the event loop, and C: we need to start the event loop to create a window.
+	// So, we use EventLoopExtPumpEvents::pump_app_events to run the event loop until we
+	// can get a window, then use that to create the application struct, then use that to
+	// start the event loop
+	info!("Running initialization event_loop...");
 	let mut event_loop = EventLoop::new()?;
 	let mut init_data = InitData::default();
-	
-	info!("Running initialization event_loop...");
 	let window = loop {
 		event_loop.pump_app_events(None, &mut init_data);
 		if let Some(window) = mem::take(&mut init_data.window) {
@@ -85,6 +90,8 @@ fn main() -> Result<()> {
 
 
 
+
+// the entire purpose of this is to get a usable window
 
 #[derive(Default)]
 pub struct InitData {
@@ -161,7 +168,7 @@ impl<'a> ApplicationHandler for ProgramData<'a> {
 			WindowEvent::RedrawRequested => {
 				let result = redraw_requested(program_data, event_loop);
 				if let Err(err) = result {
-					info!("Fatal error while processing frame: {err}");
+					error!("Fatal error while processing frame: {err}");
 					event_loop.exit();
 				}
 			},
@@ -186,13 +193,12 @@ impl<'a> ApplicationHandler for ProgramData<'a> {
 
 
 pub fn resize(program_data: &mut ProgramData, new_size: PhysicalSize<u32>) -> Result<()> {
-	if new_size.width == 0 {return Err(Error::msg("Width cannot be 0"));}
-	if new_size.height == 0 {return Err(Error::msg("Height cannot be 0"));}
 	let render_context = &mut program_data.render_context;
-	render_context.size = new_size;
+	render_context.surface_size = new_size;
 	render_context.aspect_ratio = new_size.width as f32 / new_size.height as f32;
 	render_context.surface_config.width = new_size.width;
 	render_context.surface_config.height = new_size.height;
+	if new_size.width == 0 || new_size.height == 0 {return Ok(());}
 	render_context.drawable_surface.configure(&render_context.device, &render_context.surface_config);
 	program_data.render_assets.depth = load::load_depth_render_data(render_context)?;
 	Ok(())
@@ -200,44 +206,64 @@ pub fn resize(program_data: &mut ProgramData, new_size: PhysicalSize<u32>) -> Re
 
 
 
+
+
 pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEventLoop) -> Result<()> {
+	
 	
 	let frame_start_time = Instant::now();
 	
 	let dt = program_data.step_dt();
 	update::update(program_data, dt)?;
 	
-	let output = program_data.render_context.drawable_surface.get_current_texture()?;
-	let render_result = render::render(&output, program_data);
-	if let Err(err) = render_result {
-		match err {
-			wgpu::SurfaceError::Lost => {
-				let size = program_data.render_context.size;
-				warn!("Swap chain lost, attempting to resize...");
-				resize(program_data, size).context("Failed to resize window.")?;
+	
+	// make sure to only render when the window is visible
+	let size = program_data.render_context.surface_size;
+	if size.width > 0 && size.height > 0 {
+		
+		
+		let surface_output_result = program_data.render_context.drawable_surface.get_current_texture();
+		let surface_output = match surface_output_result {
+			StdResult::Ok(v) => v,
+			StdResult::Err(wgpu::SurfaceError::Lost) => {
+				warn!("Surface was lost, attempting to resize...");
+				resize(program_data, program_data.render_context.surface_size).context("Failed to resize window.")?;
+				program_data.render_context.drawable_surface.get_current_texture()?
 			}
-			wgpu::SurfaceError::OutOfMemory => {
+			StdResult::Err(wgpu::SurfaceError::Outdated) => {
+				warn!("Surface is outdated, attempting to resize...");
+				resize(program_data, program_data.render_context.surface_size).context("Failed to resize window.")?;
+				program_data.render_context.drawable_surface.get_current_texture()?
+			}
+			StdResult::Err(wgpu::SurfaceError::OutOfMemory) => {
 				warn!("OutOfMemory error while rendering, exiting process.");
 				event_loop.exit();
 				return Ok(());
 			}
-			err => return Err(err.into()),
+			StdResult::Err(err) => return Err(err.into()),
+		};
+		
+		render::render(&surface_output, program_data);
+		
+		
+		let frame_time = frame_start_time.elapsed();
+		if frame_time < program_data.min_frame_time {
+			let sleep_time = program_data.min_frame_time - frame_time;
+			thread::sleep(sleep_time);
 		}
+		
+		let fps_counter_output = program_data.fps_counter.step(frame_start_time.elapsed());
+		if let Some((average_fps, average_frame_time)) = fps_counter_output {
+			info!("FPS: {average_fps}  (avg frame time: {average_frame_time:?})");
+		}
+		
+		
+		program_data.window.pre_present_notify();
+		surface_output.present();
+		
+		
 	}
 	
-	let frame_time = frame_start_time.elapsed();
-	if frame_time < program_data.min_frame_time {
-		let sleep_time = program_data.min_frame_time - frame_time;
-		thread::sleep(sleep_time);
-	}
-	
-	let fps_counter_output = program_data.fps_counter.step(frame_start_time.elapsed());
-	if let Some((average_fps, average_frame_time)) = fps_counter_output {
-		info!("FPS: {average_fps}  (avg frame time: {average_frame_time:?})");
-	}
-	
-	program_data.window.pre_present_notify();
-	output.present();
 	
 	Ok(())
 }

@@ -2,9 +2,9 @@ use crate::prelude::*;
 
 
 
-pub fn load_texture_bind_layouts(render_context: &RenderContextData) -> TextureBindLayouts {
+pub fn load_generic_bind_layouts(render_context: &RenderContextData) -> GenericBindLayouts {
 	
-	let generic = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+	let texture_2d = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 		entries: &[
 			wgpu::BindGroupLayoutEntry { // texture view
 				binding: 0,
@@ -23,10 +23,10 @@ pub fn load_texture_bind_layouts(render_context: &RenderContextData) -> TextureB
 				count: None,
 			},
 		],
-		label: Some("texture_bind_group_layout"),
+		label: Some("texture_2d_bind_layout"),
 	});
 	
-	let cube = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+	let texture_cube = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 		entries: &[
 			wgpu::BindGroupLayoutEntry { // texture view
 				binding: 0,
@@ -45,11 +45,11 @@ pub fn load_texture_bind_layouts(render_context: &RenderContextData) -> TextureB
 				count: None,
 			},
 		],
-		label: Some("cube_texture_bind_group_layout"),
+		label: Some("texture_cube_bind_layout"),
 	});
 	
-	TextureBindLayouts {
-		generic,
-		cube,
+	GenericBindLayouts {
+		texture_2d,
+		texture_cube,
 	}
 }

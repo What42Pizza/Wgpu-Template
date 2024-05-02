@@ -1,8 +1,10 @@
 use crate::prelude::*;
 
+// The purpose of this is to make sure textures are only loaded once
 
 
-pub fn get_material_index(path: impl AsRef<Path>, list: &[MaterialRenderData]) -> Option<usize> {
+
+pub fn get_material_id(path: impl AsRef<Path>, list: &[MaterialRenderData]) -> Option<MaterialId> {
 	let path = path.as_ref();
 	list.iter().enumerate()
 		.find(|(_i, material)| &*material.path == path)
@@ -13,10 +15,10 @@ pub fn insert_material_2d(
 	path: impl Into<PathBuf>,
 	materials_storage: &mut MaterialsStorage,
 	render_context: &RenderContextData,
-	generic_texture_bind_layout: &wgpu::BindGroupLayout,
-) -> Result<usize> {
+	generic_bind_layouts: &GenericBindLayouts,
+) -> Result<MaterialId> {
 	let output = materials_storage.list_2d.len();
-	let material = load_material_2d(path, render_context, generic_texture_bind_layout)?;
+	let material = load_material_2d(path, render_context, &generic_bind_layouts.texture_2d)?;
 	materials_storage.list_2d.push(material);
 	Ok(output)
 }
@@ -25,10 +27,10 @@ pub fn insert_material_cube(
 	path: impl Into<PathBuf>,
 	materials_storage: &mut MaterialsStorage,
 	render_context: &RenderContextData,
-	cube_texture_bind_layout: &wgpu::BindGroupLayout,
-) -> Result<usize> {
+	generic_bind_layouts: &GenericBindLayouts,
+) -> Result<MaterialId> {
 	let output = materials_storage.list_cube.len();
-	let material = load_material_cube(path, render_context, cube_texture_bind_layout)?;
+	let material = load_material_cube(path, render_context, &generic_bind_layouts.texture_cube)?;
 	materials_storage.list_cube.push(material);
 	Ok(output)
 }
@@ -41,7 +43,7 @@ pub fn insert_material_cube(
 pub fn load_material_2d(
 	path: impl Into<PathBuf>,
 	render_context: &RenderContextData,
-	texture_bind_layout: &wgpu::BindGroupLayout,
+	texture_2d_bind_layout: &wgpu::BindGroupLayout,
 ) -> Result<MaterialRenderData> {
 	let path = path.into();
 	
@@ -96,7 +98,7 @@ pub fn load_material_2d(
 	});
 	
 	let bind_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
-		layout: texture_bind_layout,
+		layout: texture_2d_bind_layout,
 		entries: &[
 			wgpu::BindGroupEntry { // texture view
 				binding: 0,
@@ -122,7 +124,7 @@ pub fn load_material_2d(
 pub fn load_material_cube(
 	path: impl Into<PathBuf>,
 	render_context: &RenderContextData,
-	texture_bind_layout: &wgpu::BindGroupLayout,
+	texture_cube_bind_layout: &wgpu::BindGroupLayout,
 ) -> Result<MaterialRenderData> {
 	let path = path.into();
 	
@@ -181,7 +183,7 @@ pub fn load_material_cube(
 	});
 	
 	let bind_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
-		layout: texture_bind_layout,
+		layout: texture_cube_bind_layout,
 		entries: &[
 			wgpu::BindGroupEntry { // texture view
 				binding: 0,

@@ -10,6 +10,8 @@
 		"multiview",
 		"OPENGL",
 		"repr",
+		"RUSTLTD",
+		"Skyboxes",
 		"texcoords",
 		"tobj",
 		"Unorm",

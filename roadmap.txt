@@ -7,6 +7,7 @@ post-processing
 gui system
 text rendering
 texture compression?
+physics engine integration
 
 for later projects:
 terrain generation

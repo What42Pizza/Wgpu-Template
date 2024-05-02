@@ -5,8 +5,8 @@ use serde_hjson::{Map, Value};
 
 
 
-pub mod load_texture_bind_layouts;
-pub use load_texture_bind_layouts::*;
+pub mod load_generic_bind_layouts;
+pub use load_generic_bind_layouts::*;
 pub mod load_assets;
 pub use load_assets::*;
 pub mod load_pipelines;
@@ -22,7 +22,7 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 	let camera = Camera::new((0., 1., 2.));
 	
 	let render_context = load_render_context_data(window, &engine_config)?;
-	let render_layouts = load_texture_bind_layouts(&render_context);
+	let render_layouts = load_generic_bind_layouts(&render_context);
 	let render_assets = load_render_assets(&render_context, &render_layouts)?;
 	let render_pipelines = load_render_pipelines(&render_context, &render_layouts, &render_assets)?;
 	
@@ -217,7 +217,7 @@ pub async fn load_render_context_data_async<'a>(window: &'a Window, engine_confi
 		device,
 		command_queue: queue,
 		surface_config: config,
-		size,
+		surface_size: size,
 		aspect_ratio: size.width as f32 / size.height as f32,
 	})
 }

@@ -13,7 +13,7 @@ pub struct ProgramData<'a> {
 	pub fps_counter: FpsCounter,
 	
 	pub render_context: RenderContextData<'a>,
-	pub render_layouts: TextureBindLayouts,
+	pub render_layouts: GenericBindLayouts,
 	pub render_assets: RenderAssets,
 	pub render_pipelines: RenderPipelines,
 	
@@ -42,24 +42,23 @@ pub struct RenderContextData<'a> {
 	pub device: wgpu::Device,
 	pub command_queue: wgpu::Queue,
 	pub surface_config: wgpu::SurfaceConfiguration,
-	pub size: winit::dpi::PhysicalSize<u32>,
+	pub surface_size: winit::dpi::PhysicalSize<u32>,
 	pub aspect_ratio: f32,
 }
 
 
 
-pub struct TextureBindLayouts {
-	pub generic: wgpu::BindGroupLayout,
-	pub cube: wgpu::BindGroupLayout,
+pub struct GenericBindLayouts {
+	pub texture_2d: wgpu::BindGroupLayout,
+	pub texture_cube: wgpu::BindGroupLayout,
 }
 
 
 
 pub struct RenderAssets {
-	pub dummy_buffer: wgpu::Buffer,
 	pub materials_storage: MaterialsStorage,
-	pub example_model: ModelRenderData,
-	pub skybox_material_index: usize,
+	pub example_models: ModelsRenderData,
+	pub skybox_material_id: MaterialId,
 	pub depth: DepthRenderData,
 	pub camera: CameraRenderData,
 }
@@ -78,12 +77,14 @@ impl MaterialsStorage {
 	}
 }
 
+pub type MaterialId = usize;
+
 pub struct MaterialRenderData {
-	pub path: PathBuf,
+	pub path: PathBuf, // used to make sure the same data isn't loaded multiple times
 	pub bind_group: wgpu::BindGroup,
 }
 
-pub struct ModelRenderData {
+pub struct ModelsRenderData {
 	pub instances_buffer: wgpu::Buffer,
 	pub instances_count: u32,
 	pub meshes: Vec<MeshRenderData>,
@@ -93,13 +94,20 @@ pub struct MeshRenderData {
 	pub vertex_buffer: wgpu::Buffer,
 	pub index_buffer: wgpu::Buffer,
 	pub index_count: u32,
-	pub material_index: usize,
+	pub material_id: MaterialId,
 }
 
+// Many structs like this only have whatever data is actually used, if you run into a
+// situation where you need the Texture, Sampler, etc then you can just add them to the
+// relevant struct
 pub struct DepthRenderData {
 	pub view: wgpu::TextureView,
 }
 
+// It may be a bit disorienting to have two Camera structs, but just keep this is mind:
+// the struct `Camera` holds the data used for app logic, the `CameraRenderData` holds
+// the data for rendering logic, and data is moved from `Camera` to `CameraRenderData`
+// each frame (or whenever needed)
 pub struct CameraRenderData {
 	pub buffer: wgpu::Buffer,
 	pub bind_layout: wgpu::BindGroupLayout,
@@ -142,15 +150,15 @@ impl GenericVertex {
 
 
 
-pub struct Instance {
+pub struct InstanceData {
 	pub position: glam::Vec3,
 	pub rotation: glam::Quat,
 }
 
-impl Instance {
-	pub fn to_raw(&self) -> InstanceRaw {
+impl InstanceData {
+	pub fn to_raw(&self) -> RawInstanceData {
 		let model_data = glam::Mat4::from_translation(self.position) * glam::Mat4::from_quat(self.rotation);
-		InstanceRaw {
+		RawInstanceData {
 			model: model_data.to_cols_array_2d(),
 		}
 	}
@@ -158,42 +166,26 @@ impl Instance {
 
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct InstanceRaw {
+pub struct RawInstanceData {
 	pub model: [[f32; 4]; 4],
 }
 
-impl InstanceRaw {
+impl RawInstanceData {
 	pub const ATTRIBUTES: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
 		3 => Float32x4,
 		4 => Float32x4,
 		5 => Float32x4,
 		6 => Float32x4
 	];
-	pub fn get_layout() -> wgpu::VertexBufferLayout<'static> {
+	pub const fn get_layout() -> wgpu::VertexBufferLayout<'static> {
 		use std::mem;
 		wgpu::VertexBufferLayout {
-			array_stride: mem::size_of::<InstanceRaw>() as wgpu::BufferAddress,
+			array_stride: mem::size_of::<RawInstanceData>() as wgpu::BufferAddress,
 			step_mode: wgpu::VertexStepMode::Instance,
 			attributes: &Self::ATTRIBUTES,
 		}
 	}
 }
-
-
-
-pub const VERTICES: &[GenericVertex] = &[
-	GenericVertex { position: [-0.0868241, 0.49240386, 0.0], tex_coords: [0.4131759, 0.00759614], normal: [0.0, 0.0, 0.0] },
-	GenericVertex { position: [-0.49513406, 0.06958647, 0.0], tex_coords: [0.0048659444, 0.43041354], normal: [0.0, 0.0, 0.0] },
-	GenericVertex { position: [-0.21918549, -0.44939706, 0.0], tex_coords: [0.28081453, 0.949397], normal: [0.0, 0.0, 0.0] },
-	GenericVertex { position: [0.35966998, -0.3473291, 0.0], tex_coords: [0.85967, 0.84732914], normal: [0.0, 0.0, 0.0] },
-	GenericVertex { position: [0.44147372, 0.2347359, 0.0], tex_coords: [0.9414737, 0.2652641], normal: [0.0, 0.0, 0.0] },
-];
-
-pub const INDICES: &[u16] = &[
-	0, 1, 4,
-	1, 2, 4,
-	2, 3, 4,
-];
 
 
 
@@ -209,6 +201,11 @@ pub struct Camera {
 }
 
 impl Camera {
+	// Ideally you should use some sort of processing cpu-side that accounts for the fact
+	// that `glam` (and similar crates) expect a z-range of -1 to 1 while wgpu expects a
+	// z-range of 0 to 1, but I haven't been able to integrate this matrix with the
+	// skybox code, and I've found that it's easier to just correct the z-range at the
+	// end of the vertex shaders (`pos.z = pos.z * 0.5 + 0.25`)
 	pub const OPENGL_TO_WGPU_MATRIX: glam::Mat4 = glam::Mat4::from_cols_array(&[
 		1.0, 0.0, 0.0, 0.0,
 		0.0, 1.0, 0.0, 0.0,
