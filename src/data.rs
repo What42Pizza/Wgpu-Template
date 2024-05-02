@@ -6,21 +6,19 @@ use winit::keyboard::KeyCode;
 
 pub struct ProgramData<'a> {
 	
+	pub start_time: Instant,
 	pub window: &'a Window,
 	pub pressed_keys: HashMap<KeyCode, bool>,
 	pub frame_start_instant: Instant,
 	pub min_frame_time: Duration,
+	pub fps_counter: FpsCounter,
 	
 	pub render_context: wgpu_integration::RenderContextData<'a>,
-	pub texture_layout: wgpu::BindGroupLayout,
-	pub depth_render_data: DepthRenderData,
-	pub camera_render_data: CameraRenderData,
-	pub test_model_render_data: ModelRenderData,
-	pub test_render_pipeline: wgpu::RenderPipeline,
-	pub camera: Camera,
+	pub render_layouts: TextureLayouts,
+	pub render_assets: RenderAssets,
+	pub render_pipelines: RenderPipelines,
 	
-	pub start_time: Instant,
-	pub fps_counter: FpsCounter,
+	pub camera: Camera,
 	
 }
 
@@ -40,15 +38,37 @@ impl<'a> ProgramData<'a> {
 
 
 
-pub struct DepthRenderData {
-	pub texture: wgpu::Texture,
-	pub view: wgpu::TextureView,
-	pub sampler: wgpu::Sampler,
+pub struct TextureLayouts {
+	pub generic: wgpu::BindGroupLayout,
+	pub cube: wgpu::BindGroupLayout,
 }
 
-pub struct CameraRenderData {
-	pub buffer: wgpu::Buffer,
-	pub bind_layout: wgpu::BindGroupLayout,
+
+
+pub struct RenderAssets {
+	pub materials_storage: MaterialsStorage,
+	pub test_model: ModelRenderData,
+	pub depth: DepthRenderData,
+	pub camera: CameraRenderData,
+}
+
+pub struct MaterialsStorage {
+	pub list: Vec<MaterialRenderData>,
+}
+
+impl MaterialsStorage {
+	pub fn new() -> Self {
+		Self {
+			list: vec!(),
+		}
+	}
+}
+
+pub struct MaterialRenderData {
+	pub name: String,
+	//pub texture: wgpu::Texture,
+	//pub view: wgpu::TextureView,
+	//pub sampler: wgpu::Sampler,
 	pub bind_group: wgpu::BindGroup,
 }
 
@@ -56,7 +76,6 @@ pub struct ModelRenderData {
 	pub instances_buffer: wgpu::Buffer,
 	pub instances_count: u32,
 	pub meshes: Vec<MeshRenderData>,
-	pub materials: Vec<MaterialRenderData>,
 }
 
 pub struct MeshRenderData {
@@ -66,11 +85,23 @@ pub struct MeshRenderData {
 	pub material_index: usize,
 }
 
-pub struct MaterialRenderData {
-	pub texture: wgpu::Texture,
+pub struct DepthRenderData {
+	//pub texture: wgpu::Texture,
 	pub view: wgpu::TextureView,
-	pub sampler: wgpu::Sampler,
+	//pub sampler: wgpu::Sampler,
+}
+
+pub struct CameraRenderData {
+	pub buffer: wgpu::Buffer,
+	pub bind_layout: wgpu::BindGroupLayout,
 	pub bind_group: wgpu::BindGroup,
+}
+
+
+
+pub struct RenderPipelines {
+	pub test: wgpu::RenderPipeline,
+	pub skybox: wgpu::RenderPipeline,
 }
 
 
@@ -81,6 +112,7 @@ pub struct TextureData {
 	pub texture: wgpu::Texture,
 	pub view: wgpu::TextureView,
 	pub sampler: wgpu::Sampler,
+	pub bind_group: wgpu::BindGroup
 }
 
 

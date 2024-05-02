@@ -1,5 +1,5 @@
 // Started:      24/04/18
-// Last updated: 24/04/30
+// Last updated: 24/05/01
 
 // Learn Wgpu website: https://sotrh.github.io/learn-wgpu/
 // Learn Wgpu repo: https://github.com/sotrh/learn-wgpu
@@ -75,7 +75,7 @@ fn main() -> Result<()> {
 	};
 	
 	info!("Done, starting main event_loop...");
-	let mut program_data = load::init_program_data(start_time, &window)?;
+	let mut program_data = load::load_program_data(start_time, &window)?;
 	event_loop.run_app(&mut program_data)?;
 	
 	Ok(())
@@ -193,7 +193,7 @@ pub fn resize(program_data: &mut ProgramData, new_size: PhysicalSize<u32>) -> Re
 	render_context.surface_config.width = new_size.width;
 	render_context.surface_config.height = new_size.height;
 	render_context.drawable_surface.configure(&render_context.device, &render_context.surface_config);
-	program_data.depth_render_data = load::load_depth_render_data(render_context)?;
+	program_data.render_assets.depth = load::load_depth_render_data(render_context)?;
 	Ok(())
 }
 

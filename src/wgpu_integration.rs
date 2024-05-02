@@ -1,7 +1,5 @@
 use crate::prelude::*;
-use std::io::{BufReader, Cursor};
 use async_std::task::block_on;
-use wgpu::util::DeviceExt;
 use winit::window::Window;
 
 
@@ -21,11 +19,11 @@ pub struct RenderContextData<'a> {
 
 
 
-pub fn init_wgpu_context_data<'a>(window: &'a Window, engine_config: &load::EngineConfig) -> Result<RenderContextData<'a>> {
-	block_on(init_wgpu_context_data_async(window, engine_config))
+pub fn load_render_context_data<'a>(window: &'a Window, engine_config: &load::EngineConfig) -> Result<RenderContextData<'a>> {
+	block_on(load_render_context_data_async(window, engine_config))
 }
 
-pub async fn init_wgpu_context_data_async<'a>(window: &'a Window, engine_config: &load::EngineConfig) -> Result<RenderContextData<'a>> {
+pub async fn load_render_context_data_async<'a>(window: &'a Window, engine_config: &load::EngineConfig) -> Result<RenderContextData<'a>> {
 	let size = window.inner_size();
 	
 	// The instance is a handle to our GPU
@@ -95,7 +93,7 @@ pub async fn init_wgpu_context_data_async<'a>(window: &'a Window, engine_config:
 
 
 
-pub fn init_wgpu_pipeline(
+pub fn load_pipeline(
 	name: &str,
 	shader_path: impl AsRef<Path>,
 	bind_group_layouts: &[&wgpu::BindGroupLayout],
@@ -165,9 +163,14 @@ pub fn init_wgpu_pipeline(
 
 
 
-pub fn load_texture(path: impl AsRef<Path>, render_context: &RenderContextData) -> Result<TextureData> {
+pub fn load_material(
+	name: String,
+	parent_path: impl AsRef<Path>,
+	render_context: &RenderContextData,
+	texture_layout: &wgpu::BindGroupLayout
+) -> Result<MaterialRenderData> {
 	
-	let raw_texture_bytes = fs::read(utils::get_program_file_path(path))?;
+	let raw_texture_bytes = fs::read(utils::get_program_file_path(parent_path.as_ref().join(&name)))?;
 	let texture_bytes = image::load_from_memory(&raw_texture_bytes)?;
 	let texture_bytes = texture_bytes.to_rgba8();
 	let dimensions = texture_bytes.dimensions();
@@ -217,113 +220,26 @@ pub fn load_texture(path: impl AsRef<Path>, render_context: &RenderContextData) 
 		..Default::default()
 	});
 	
-	Ok(TextureData {
-		texture,
-		view,
-		sampler,
+	let bind_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
+		layout: texture_layout,
+		entries: &[
+			wgpu::BindGroupEntry { // texture view
+				binding: 0,
+				resource: wgpu::BindingResource::TextureView(&view),
+			},
+			wgpu::BindGroupEntry { // sampler
+				binding: 1,
+				resource: wgpu::BindingResource::Sampler(&sampler),
+			},
+		],
+		label: None,
+	});
+	
+	Ok(MaterialRenderData {
+		name,
+		//texture,
+		//view,
+		//sampler,
+		bind_group,
 	})
-}
-
-
-
-
-
-pub fn load_model(
-	file_path: impl AsRef<Path>,
-	render_context: &RenderContextData,
-	layout: &wgpu::BindGroupLayout,
-) -> Result<(Vec<MeshRenderData>, Vec<MaterialRenderData>)> {
-	let file_path = file_path.as_ref();
-	let obj_text = fs::read_to_string(file_path)?;
-	let obj_cursor = Cursor::new(obj_text);
-	let mut obj_reader = BufReader::new(obj_cursor);
-	let parent_path = file_path.parent().expect("Cannot load mesh at root directory");
-	
-	let (models, obj_materials) = tobj::load_obj_buf(
-		&mut obj_reader,
-		&tobj::LoadOptions {
-			triangulate: true,
-			single_index: true,
-			..Default::default()
-		},
-		move |p| {
-			let mat_text = fs::read_to_string(parent_path.join(p)).map_err(|_err| tobj::LoadError::OpenFileFailed)?;
-			tobj::load_mtl_buf(&mut BufReader::new(Cursor::new(mat_text)))
-		}
-	)?;
-	let obj_materials = obj_materials?;
-	
-	let mut materials = Vec::new();
-	for material in obj_materials {
-		let Some(diffuse_texture_path) = material.diffuse_texture.as_ref() else {
-			warn!("diffuse texture in material is `None`.");
-			continue;
-		};
-		let texture = load_texture(parent_path.join(diffuse_texture_path), render_context)?;
-		let bind_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
-			layout,
-			entries: &[
-				wgpu::BindGroupEntry {
-					binding: 0,
-					resource: wgpu::BindingResource::TextureView(&texture.view),
-				},
-				wgpu::BindGroupEntry {
-					binding: 1,
-					resource: wgpu::BindingResource::Sampler(&texture.sampler),
-				},
-			],
-			label: None,
-		});
-		
-		materials.push(MaterialRenderData {
-			texture: texture.texture,
-			view: texture.view,
-			sampler: texture.sampler,
-			bind_group,
-		})
-	}
-	
-	let meshes = models
-		.into_iter()
-		.map(|model| {
-			let vertices = (0..model.mesh.positions.len() / 3)
-				.map(|i| GenericVertex {
-					position: [
-						model.mesh.positions[i * 3],
-						model.mesh.positions[i * 3 + 1],
-						model.mesh.positions[i * 3 + 2],
-					],
-					tex_coords: [model.mesh.texcoords[i * 2], 1.0 - model.mesh.texcoords[i * 2 + 1]],
-					normal: [
-						model.mesh.normals[i * 3],
-						model.mesh.normals[i * 3 + 1],
-						model.mesh.normals[i * 3 + 2],
-					],
-				})
-				.collect::<Vec<_>>();
-			
-			let vertex_buffer = render_context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-				label: Some(&format!("{:?} Vertex Buffer", &file_path)),
-				contents: bytemuck::cast_slice(&vertices),
-				usage: wgpu::BufferUsages::VERTEX,
-			});
-			let index_buffer = render_context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-				label: Some(&format!("{:?} Index Buffer", &file_path)),
-				contents: bytemuck::cast_slice(&model.mesh.indices),
-				usage: wgpu::BufferUsages::INDEX,
-			});
-			
-			MeshRenderData {
-				vertex_buffer,
-				index_buffer,
-				index_count: model.mesh.indices.len() as u32,
-				material_index: model.mesh.material_id.unwrap_or(0),
-			}
-		})
-		.collect::<Vec<_>>();
-	
-	Ok((
-		meshes,
-		materials,
-	))
 }

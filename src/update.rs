@@ -38,11 +38,11 @@ fn update_camera(program_data: &mut ProgramData, dt: f32) {
 		program_data.camera.eye = program_data.camera.target - (forward - right * speed * 0.3).normalize() * forward_mag;
 	}
 	
-	let new_camera_data: [[f32; 4]; 4] = program_data.camera.build_view_projection_matrix(program_data.render_context.aspect_ratio).into();
+	let view_poj_mat: [[f32; 4]; 4] = program_data.camera.build_view_projection_matrix(program_data.render_context.aspect_ratio).into();
 	program_data.render_context.command_queue.write_buffer(
-		&program_data.camera_render_data.buffer,
+		&program_data.render_assets.camera.buffer,
 		0,
-		bytemuck::cast_slice(&[new_camera_data]),
+		bytemuck::cast_slice(&[view_poj_mat]),
 	);
 	
 }
