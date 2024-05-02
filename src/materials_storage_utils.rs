@@ -130,7 +130,7 @@ pub fn load_material_cube(
 	let texture_bytes = image::load_from_memory(&raw_texture_bytes)?;
 	let texture_bytes = texture_bytes.to_rgba8();
 	let dimensions = texture_bytes.dimensions();
-	let dimensions = (dimensions.0 / 3, dimensions.1 / 2);
+	let dimensions = (dimensions.0, dimensions.1 / 6);
 	
 	let texture_size = wgpu::Extent3d {
 		width: dimensions.0,

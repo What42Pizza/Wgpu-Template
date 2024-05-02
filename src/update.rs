@@ -13,28 +13,35 @@ pub fn update(program_data: &mut ProgramData, dt: f32) -> Result<()> {
 
 
 fn update_camera(program_data: &mut ProgramData, dt: f32) {
-	let speed = 100.0 * dt;
+	let speed = 30.0 * dt;
 	let forward = program_data.camera.target - program_data.camera.eye;
-	let forward_norm = forward.normalize();
+	let forward_dir = forward.normalize();
 	let forward_mag = forward.length();
 	
 	if program_data.key_is_down(KeyCode::KeyW) && forward_mag > speed {
-		program_data.camera.eye += forward_norm * speed;
+		program_data.camera.eye += forward_dir * speed;
 	}
 	if program_data.key_is_down(KeyCode::KeyS) {
-		program_data.camera.eye -= forward_norm * speed;
+		program_data.camera.eye -= forward_dir * speed;
 	}
 	
-	let right = forward_norm.cross(program_data.camera.up);
+	let right_dir = forward_dir.cross(program_data.camera.up);
 	
 	let forward = program_data.camera.target - program_data.camera.eye;
 	let forward_mag = forward.length();
 	
 	if program_data.key_is_down(KeyCode::KeyD) {
-		program_data.camera.eye = program_data.camera.target - (forward + right * speed * 0.3).normalize() * forward_mag;
+		program_data.camera.eye += right_dir * speed;
 	}
 	if program_data.key_is_down(KeyCode::KeyA) {
-		program_data.camera.eye = program_data.camera.target - (forward - right * speed * 0.3).normalize() * forward_mag;
+		program_data.camera.eye -= right_dir * speed;
+	}
+	
+	if program_data.key_is_down(KeyCode::KeyE) {
+		program_data.camera.eye.y += speed;
+	}
+	if program_data.key_is_down(KeyCode::KeyQ) {
+		program_data.camera.eye.y -= speed;
 	}
 	
 	let view_poj_mat = program_data.camera.build_data(program_data.render_context.aspect_ratio);

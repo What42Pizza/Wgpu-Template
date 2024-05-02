@@ -1,4 +1,3 @@
-skybox
 shadows
 water
 post-processing
