@@ -1,5 +1,5 @@
 // Started:      24/04/18
-// Last updated: 24/05/02
+// Last updated: 24/05/03
 
 // Learn Wgpu website: https://sotrh.github.io/learn-wgpu/
 // Learn Wgpu repo: https://github.com/sotrh/learn-wgpu
@@ -43,7 +43,7 @@ pub mod prelude {
 }
 
 use crate::prelude::*;
-use std::{env, mem, thread};
+use std::{env, thread};
 use winit::{
 	application::ApplicationHandler,
 	dpi::PhysicalSize,
@@ -64,18 +64,18 @@ fn main() -> Result<()> {
 	}
 	env_logger::init();
 	
-	// There's kinda a catch-22 here where A: we need the window to be available before
-	// we create the application struct, B: we need the application struct in order to
-	// start the event loop, and C: we need to start the event loop to create a window.
-	// So, we use EventLoopExtPumpEvents::pump_app_events to run the event loop until we
-	// can get a window, then use that to create the application struct, then use that to
-	// start the event loop
+	// With Winit 0.30.0, there's kinda a catch-22 here where A: we need the window to be
+	// available before we create the application struct, B: we need the application
+	// struct in order to start the event loop, and C: we need to start the event loop to
+	// create a window. So, we use EventLoopExtPumpEvents::pump_app_events to run the
+	// event loop until we can get a window, then use that to create the application
+	// struct, then use that to start the event loop
 	info!("Running initialization event_loop...");
 	let mut event_loop = EventLoop::new()?;
 	let mut init_data = InitData::default();
 	let window = loop {
 		event_loop.pump_app_events(None, &mut init_data);
-		if let Some(window) = mem::take(&mut init_data.window) {
+		if let Some(window) = init_data.window {
 			break window;
 		}
 	};
@@ -185,7 +185,7 @@ impl<'a> ApplicationHandler for ProgramData<'a> {
 	
 	fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
 		let program_data = self;
-		program_data.window.request_redraw();
+		program_data.render_context.window.request_redraw();
 	}
 	
 }
@@ -214,25 +214,30 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 	let frame_start_time = Instant::now();
 	
 	let dt = program_data.step_dt();
-	update::update(program_data, dt)?;
+	let should_exit = update::update(program_data, dt)?;
+	if should_exit {
+		event_loop.exit();
+		return Ok(());
+	}
 	
 	
 	// make sure to only render when the window is visible
-	let size = program_data.render_context.surface_size;
+	let render_context = &program_data.render_context;
+	let size = render_context.surface_size;
 	if size.width > 0 && size.height > 0 {
 		
 		
-		let surface_output_result = program_data.render_context.drawable_surface.get_current_texture();
+		let surface_output_result = render_context.drawable_surface.get_current_texture();
 		let surface_output = match surface_output_result {
 			StdResult::Ok(v) => v,
 			StdResult::Err(wgpu::SurfaceError::Lost) => {
 				warn!("Surface was lost, attempting to resize...");
-				resize(program_data, program_data.render_context.surface_size).context("Failed to resize window.")?;
+				resize(program_data, render_context.surface_size).context("Failed to resize window.")?;
 				program_data.render_context.drawable_surface.get_current_texture()?
 			}
 			StdResult::Err(wgpu::SurfaceError::Outdated) => {
 				warn!("Surface is outdated, attempting to resize...");
-				resize(program_data, program_data.render_context.surface_size).context("Failed to resize window.")?;
+				resize(program_data, render_context.surface_size).context("Failed to resize window.")?;
 				program_data.render_context.drawable_surface.get_current_texture()?
 			}
 			StdResult::Err(wgpu::SurfaceError::OutOfMemory) => {
@@ -247,8 +252,9 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 		
 		
 		let frame_time = frame_start_time.elapsed();
-		if frame_time < program_data.min_frame_time {
-			let sleep_time = program_data.min_frame_time - frame_time;
+		let min_frame_time = program_data.engine_config.min_frame_time;
+		if frame_time < min_frame_time {
+			let sleep_time = min_frame_time - frame_time;
 			thread::sleep(sleep_time);
 		}
 		
@@ -258,7 +264,7 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 		}
 		
 		
-		program_data.window.pre_present_notify();
+		program_data.render_context.window.pre_present_notify();
 		surface_output.present();
 		
 		

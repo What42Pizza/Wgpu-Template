@@ -5,19 +5,22 @@ use winit::keyboard::KeyCode;
 
 pub struct ProgramData<'a> {
 	
+	// engine data
 	pub start_time: Instant,
-	pub window: &'a Window,
+	pub engine_config: EngineConfig,
 	pub pressed_keys: HashMap<KeyCode, bool>,
-	pub frame_start_instant: Instant,
-	pub min_frame_time: Duration,
+	
+	// app data
+	pub camera_data: CameraData,
+	pub shadow_caster_data: ShadowCasterData,
 	pub fps_counter: FpsCounter,
 	
+	// render data
 	pub render_context: RenderContextData<'a>,
-	pub render_layouts: GenericBindLayouts,
+	pub generic_bind_layouts: GenericBindLayouts,
 	pub render_assets: RenderAssets,
 	pub render_pipelines: RenderPipelines,
-	
-	pub camera: Camera,
+	pub frame_start_instant: Instant,
 	
 }
 
@@ -37,7 +40,127 @@ impl<'a> ProgramData<'a> {
 
 
 
+pub struct EngineConfig {
+	pub rendering_backend: wgpu::Backends,
+	pub present_mode: wgpu::PresentMode,
+	pub desired_frame_latency: u32,
+	pub min_frame_time: Duration,
+	pub shadowmap_size: u32,
+}
+
+
+
+
+
+pub struct CameraData {
+	pub eye: glam::Vec3,
+	pub target: glam::Vec3,
+	pub up: glam::Vec3,
+	pub fov: f32,
+	pub near: f32,
+	pub far: f32,
+}
+
+impl CameraData {
+	// Ideally you should use some sort of processing cpu-side that accounts for the fact
+	// that `glam` (and similar crates) expect a z-range of -1 to 1 while wgpu expects a
+	// z-range of 0 to 1, but I haven't been able to integrate this matrix with the
+	// skybox code, and I've found that it's easier to just correct the z-range at the
+	// end of the vertex shaders (`pos.z = pos.z * 0.5 + 0.25`)
+	//pub const OPENGL_TO_WGPU_MATRIX: glam::Mat4 = glam::Mat4::from_cols_array(&[
+	//	1.0, 0.0, 0.0, 0.0,
+	//	0.0, 1.0, 0.0, 0.0,
+	//	0.0, 0.0, 0.5, 0.5,
+	//	0.0, 0.0, 0.0, 1.0,
+	//]);
+	pub fn build_gpu_data(&self, aspect_ratio: f32) -> [f32; 16 + 16 +16] {
+        let proj = glam::Mat4::perspective_rh(self.fov, aspect_ratio, 1.0, 50.0);
+        let view = glam::Mat4::look_at_rh(self.eye, self.target, self.up);
+        let inv_proj = proj.inverse();
+		let proj_view = proj * view;
+		let mut output = [0f32; 16 + 16 + 16];
+		output[..16].copy_from_slice(&proj_view.to_cols_array());
+		output[16..32].copy_from_slice(&inv_proj.to_cols_array());
+		output[32..48].copy_from_slice(&view.to_cols_array());
+		output
+	}
+	//pub fn default_data() -> [f32; 16 + 16 + 16] {
+	//	[0.0; 16 + 16 + 16]
+	//}
+	pub fn new(pos: (f32, f32, f32)) -> Self {
+		Self {
+			eye: pos.into(),
+			target: (0.0, 0.0, 0.0).into(),
+			up: glam::Vec3::Y,
+			fov: 45.0,
+			near: 0.1,
+			far: 100.0,
+		}
+	}
+}
+
+
+
+pub struct ShadowCasterData {
+	pub pos: glam::Quat,
+}
+
+impl ShadowCasterData {
+	pub fn build_gpu_data(&self) -> [f32; 16] {
+		glam::Mat4::look_at_rh(self.pos.xyz(), glam::Vec3::ZERO, glam::Vec3::Y).to_cols_array() // I have no clue if this is correct
+	}
+}
+
+impl Default for ShadowCasterData {
+	fn default() -> Self {
+		Self {
+			pos: glam::Quat::from_euler(glam::EulerRot::ZXY, std::f32::consts::PI * 0.25, std::f32::consts::PI * 0.25, 0.0)
+		}
+	}
+}
+
+
+
+pub struct FpsCounter {
+	pub frame_count: usize,
+	pub frame_time_total: Duration,
+	pub next_output_time: Instant,
+}
+
+impl FpsCounter {
+	
+	pub fn new() -> Self {
+		Self {
+			frame_count: 0,
+			frame_time_total: Duration::ZERO,
+			next_output_time: Instant::now(),
+		}
+	}
+	
+	pub fn step(&mut self, frame_time: Duration) -> Option<(usize, Duration)> {
+		
+		self.frame_count += 1;
+		self.frame_time_total += frame_time;
+		if self.next_output_time.elapsed().as_secs_f32() < 1.0 {return None;}
+		
+		let fps_output = self.frame_count;
+		let duration_output = self.frame_time_total / self.frame_count as u32;
+		
+		self.frame_count = 0;
+		self.frame_time_total = Duration::ZERO;
+		self.next_output_time += Duration::SECOND;
+		
+		Some((fps_output, duration_output))
+	}
+	
+}
+
+
+
+
+
 pub struct RenderContextData<'a> {
+	pub window: &'a Window,
 	pub drawable_surface: wgpu::Surface<'a>,
 	pub device: wgpu::Device,
 	pub command_queue: wgpu::Queue,
@@ -60,6 +183,7 @@ pub struct RenderAssets {
 	pub example_models: ModelsRenderData,
 	pub skybox_material_id: MaterialId,
 	pub depth: DepthRenderData,
+	pub shadow_caster: ShadowCasterRenderData,
 	pub camera: CameraRenderData,
 }
 
@@ -98,16 +222,24 @@ pub struct MeshRenderData {
 }
 
 // Many structs like this only have whatever data is actually used, if you run into a
-// situation where you need the Texture, Sampler, etc then you can just add them to the
-// relevant struct
+// situation where you also need the Texture, Sampler, etc then you can just add them to
+// the relevant struct
 pub struct DepthRenderData {
 	pub view: wgpu::TextureView,
 }
 
+pub struct ShadowCasterRenderData {
+	pub is_dirty: bool, // this is the only struct with an `is_dirty` field because it's the only struct which conditionally needs updating
+	pub depth_tex_view: wgpu::TextureView,
+	pub proj_mat_buffer: wgpu::Buffer,
+	pub proj_mat_layout: wgpu::BindGroupLayout,
+	pub proj_mat_group: wgpu::BindGroup,
+}
+
 // It may be a bit disorienting to have two Camera structs, but just keep this is mind:
-// the struct `Camera` holds the data used for app logic, the `CameraRenderData` holds
-// the data for rendering logic, and data is moved from `Camera` to `CameraRenderData`
-// each frame (or whenever needed)
+// the struct `CameraData` holds the data used for app logic, the struct
+// `CameraRenderData` holds the data for rendering logic, and data is moved from `Camera`
+// to `CameraRenderData` each frame (or whenever needed)
 pub struct CameraRenderData {
 	pub buffer: wgpu::Buffer,
 	pub bind_layout: wgpu::BindGroupLayout,
@@ -117,11 +249,10 @@ pub struct CameraRenderData {
 
 
 pub struct RenderPipelines {
-	pub example: wgpu::RenderPipeline,
+	pub shadowmap: wgpu::RenderPipeline,
+	pub example_model: wgpu::RenderPipeline,
 	pub skybox: wgpu::RenderPipeline,
 }
-
-
 
 
 
@@ -185,91 +316,4 @@ impl RawInstanceData {
 			attributes: &Self::ATTRIBUTES,
 		}
 	}
-}
-
-
-
-
-
-pub struct Camera {
-	pub eye: glam::Vec3,
-	pub target: glam::Vec3,
-	pub up: glam::Vec3,
-	pub fov: f32,
-	pub near: f32,
-	pub far: f32,
-}
-
-impl Camera {
-	// Ideally you should use some sort of processing cpu-side that accounts for the fact
-	// that `glam` (and similar crates) expect a z-range of -1 to 1 while wgpu expects a
-	// z-range of 0 to 1, but I haven't been able to integrate this matrix with the
-	// skybox code, and I've found that it's easier to just correct the z-range at the
-	// end of the vertex shaders (`pos.z = pos.z * 0.5 + 0.25`)
-	pub const OPENGL_TO_WGPU_MATRIX: glam::Mat4 = glam::Mat4::from_cols_array(&[
-		1.0, 0.0, 0.0, 0.0,
-		0.0, 1.0, 0.0, 0.0,
-		0.0, 0.0, 0.5, 0.5,
-		0.0, 0.0, 0.0, 1.0,
-	]);
-	pub fn build_data(&self, aspect_ratio: f32) -> [f32; 16 + 16 +16] {
-        let proj = glam::Mat4::perspective_rh(self.fov, aspect_ratio, 1.0, 50.0);
-        let view = glam::Mat4::look_at_rh(self.eye, self.target, self.up);
-        let inv_proj = proj.inverse();
-		let proj_view = proj * view;
-		let mut output = [0f32; 16 + 16 + 16];
-		output[..16].copy_from_slice(&proj_view.to_cols_array());
-		output[16..32].copy_from_slice(&inv_proj.to_cols_array());
-		output[32..48].copy_from_slice(&view.to_cols_array());
-		output
-	}
-	pub fn default_data() -> [f32; 16 + 16 + 16] {
-		[0.0; 16 + 16 + 16]
-	}
-	pub fn new(pos: (f32, f32, f32)) -> Self {
-		Self {
-			eye: pos.into(),
-			target: (0.0, 0.0, 0.0).into(),
-			up: glam::Vec3::Y,
-			fov: 45.0,
-			near: 0.1,
-			far: 100.0,
-		}
-	}
-}
-
-
-
-pub struct FpsCounter {
-	pub frame_count: usize,
-	pub frame_time_total: Duration,
-	pub next_output_time: Instant,
-}
-
-impl FpsCounter {
-	
-	pub fn new() -> Self {
-		Self {
-			frame_count: 0,
-			frame_time_total: Duration::ZERO,
-			next_output_time: Instant::now(),
-		}
-	}
-	
-	pub fn step(&mut self, frame_time: Duration) -> Option<(usize, Duration)> {
-		
-		self.frame_count += 1;
-		self.frame_time_total += frame_time;
-		if self.next_output_time.elapsed().as_secs_f32() < 1.0 {return None;}
-		
-		let fps_output = self.frame_count;
-		let duration_output = self.frame_time_total / self.frame_count as u32;
-		
-		self.frame_count = 0;
-		self.frame_time_total = Duration::ZERO;
-		self.next_output_time += Duration::SECOND;
-		
-		Some((fps_output, duration_output))
-	}
-	
 }

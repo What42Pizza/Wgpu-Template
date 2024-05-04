@@ -19,28 +19,36 @@ pub use load_pipelines::*;
 pub fn load_program_data(start_time: Instant, window: &Window) -> Result<ProgramData> {
 	
 	let engine_config = load_engine_config()?;
-	let camera = Camera::new((0., 1., 2.));
 	
+	// app data
+	let camera_data = CameraData::new((0., 1., 2.));
+	let shadow_caster_data = ShadowCasterData::default();
+	let fps_counter = FpsCounter::new();
+	
+	// render data
 	let render_context = load_render_context_data(window, &engine_config)?;
-	let render_layouts = load_generic_bind_layouts(&render_context);
-	let render_assets = load_render_assets(&render_context, &render_layouts)?;
-	let render_pipelines = load_render_pipelines(&render_context, &render_layouts, &render_assets)?;
+	let generic_bind_layouts = load_generic_bind_layouts(&render_context);
+	let render_assets = load_render_assets(&camera_data, &shadow_caster_data, &render_context, &generic_bind_layouts, engine_config.shadowmap_size)?;
+	let render_pipelines = load_render_pipelines(&render_context, &generic_bind_layouts, &render_assets)?;
 	
 	Ok(ProgramData {
 		
+		// engine data
 		start_time,
-		window,
+		engine_config,
 		pressed_keys: HashMap::new(),
-		frame_start_instant: start_time,
-		min_frame_time: engine_config.min_frame_time,
-		fps_counter: FpsCounter::new(),
 		
+		// app data
+		camera_data,
+		shadow_caster_data,
+		fps_counter,
+		
+		// render data
 		render_context,
-		render_layouts,
+		generic_bind_layouts,
 		render_assets,
 		render_pipelines,
-		
-		camera,
+		frame_start_instant: start_time,
 		
 	})
 }
@@ -48,13 +56,6 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 
 
 
-
-pub struct EngineConfig {
-	pub rendering_backend: wgpu::Backends,
-	pub present_mode: wgpu::PresentMode,
-	pub desired_frame_latency: u32,
-	pub min_frame_time: Duration,
-}
 
 pub fn load_engine_config() -> Result<EngineConfig> {
 	
@@ -102,11 +103,15 @@ pub fn load_engine_config() -> Result<EngineConfig> {
 	let min_frame_time_f64 = read_hjson_f64(&engine_config, "min_frame_time", 0.002);
 	let min_frame_time = Duration::from_secs_f64(min_frame_time_f64);
 	
+	let shadowmap_size_i64 = read_hjson_i64(&engine_config, "shadowmap_size", 512);
+	let shadowmap_size = shadowmap_size_i64 as u32;
+	
 	Ok(EngineConfig {
 		rendering_backend,
 		present_mode,
 		desired_frame_latency,
 		min_frame_time,
+		shadowmap_size,
 	})
 }
 
@@ -213,6 +218,7 @@ pub async fn load_render_context_data_async<'a>(window: &'a Window, engine_confi
 	surface.configure(&device, &config);
 	
 	Ok(RenderContextData {
+		window,
 		drawable_surface: surface,
 		device,
 		command_queue: queue,

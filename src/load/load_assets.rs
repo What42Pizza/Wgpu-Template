@@ -4,19 +4,27 @@ use wgpu::util::DeviceExt;
 
 
 
-pub fn load_render_assets(render_context: &RenderContextData, generic_bind_layouts: &GenericBindLayouts) -> Result<RenderAssets> {
+pub fn load_render_assets(
+	camera_data: &CameraData,
+	shadow_caster_data: &ShadowCasterData,
+	render_context: &RenderContextData,
+	generic_bind_layouts: &GenericBindLayouts,
+	shadowmap_size: u32
+) -> Result<RenderAssets> {
 	
 	let mut materials_storage = MaterialsStorage::new();
 	let example_model = load_example_model_render_data(render_context, generic_bind_layouts, &mut materials_storage)?;
 	let skybox_material_index = load_skybox_material(render_context, generic_bind_layouts, &mut materials_storage)?;
 	let depth = load_depth_render_data(render_context)?;
-	let camera = load_camera_render_data(render_context)?;
+	let shadow_caster = load_shadow_caster_data(render_context, shadowmap_size, shadow_caster_data)?;
+	let camera = load_camera_render_data(render_context, camera_data)?;
 	
 	Ok(RenderAssets {
 		materials_storage,
 		example_models: example_model,
 		skybox_material_id: skybox_material_index,
 		depth,
+		shadow_caster,
 		camera,
 	})
 }
@@ -190,7 +198,75 @@ pub fn load_depth_render_data(render_context: &RenderContextData) -> Result<Dept
 
 
 
-pub fn load_camera_render_data(render_context: &RenderContextData) -> Result<CameraRenderData> {
+pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_size: u32, shadow_caster_data: &ShadowCasterData) -> Result<ShadowCasterRenderData> {
+	
+	let size = wgpu::Extent3d {
+		width: shadowmap_size,
+		height: shadowmap_size,
+		depth_or_array_layers: 1,
+	};
+	let desc = wgpu::TextureDescriptor {
+		label: Some("Shadowmap Depth Texture"),
+		size,
+		mip_level_count: 1,
+		sample_count: 1,
+		dimension: wgpu::TextureDimension::D2,
+		format: wgpu::TextureFormat::Depth32Float,
+		usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+		view_formats: &[],
+	};
+	let depth_texture = render_context.device.create_texture(&desc);
+	let depth_tex_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
+	
+	let proj_mat_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+		entries: &[
+			wgpu::BindGroupLayoutEntry { // proj_mat
+				binding: 0,
+				visibility: wgpu::ShaderStages::VERTEX,
+				ty: wgpu::BindingType::Buffer {
+					ty: wgpu::BufferBindingType::Uniform,
+					has_dynamic_offset: false,
+					min_binding_size: None,
+				},
+				count: None,
+			},
+		],
+		label: Some("shadow_caster_bind_group_layout"),
+	});
+	
+	let proj_mat_buffer = render_context.device.create_buffer_init(
+		&wgpu::util::BufferInitDescriptor {
+			label: Some("Shadow Caster Buffer"),
+			contents: bytemuck::cast_slice(&shadow_caster_data.build_gpu_data()),
+			usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+		}
+	);
+	
+	let proj_mat_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
+		layout: &proj_mat_layout,
+		entries: &[
+			wgpu::BindGroupEntry { // proj_mat
+				binding: 0,
+				resource: proj_mat_buffer.as_entire_binding(),
+			}
+		],
+		label: Some("shadow_caster_bind_group"),
+	});
+	
+	Ok(ShadowCasterRenderData {
+		is_dirty: false,
+		depth_tex_view,
+		proj_mat_buffer,
+		proj_mat_layout,
+		proj_mat_group,
+	})
+}
+
+
+
+
+
+pub fn load_camera_render_data(render_context: &RenderContextData, camera_data: &CameraData) -> Result<CameraRenderData> {
 	
 	let bind_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 		entries: &[
@@ -208,11 +284,10 @@ pub fn load_camera_render_data(render_context: &RenderContextData) -> Result<Cam
 		label: Some("camera_bind_group_layout"),
 	});
 	
-	let initial_data = Camera::default_data();
 	let buffer = render_context.device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
 			label: Some("Camera Buffer"),
-			contents: bytemuck::cast_slice(&initial_data),
+			contents: bytemuck::cast_slice(&camera_data.build_gpu_data(render_context.aspect_ratio)),
 			usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
 		}
 	);
@@ -220,7 +295,7 @@ pub fn load_camera_render_data(render_context: &RenderContextData) -> Result<Cam
 	let bind_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
 		layout: &bind_layout,
 		entries: &[
-			wgpu::BindGroupEntry { // proj_view_mat
+			wgpu::BindGroupEntry { // proj_view_mat, inv_proj_mat, view_mat
 				binding: 0,
 				resource: buffer.as_entire_binding(),
 			}

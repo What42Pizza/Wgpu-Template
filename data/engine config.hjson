@@ -3,4 +3,5 @@
 	present_mode: auto_vsync
 	desired_frame_latency: 1
 	min_frame_time: 0.001
+	shadowmap_size: 512
 }
