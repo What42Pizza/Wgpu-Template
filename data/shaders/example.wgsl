@@ -6,8 +6,11 @@ struct CameraData {
 	view_mat: mat4x4<f32>,
 }
 
-struct VertexInput {
+struct BasicVertexInput {
 	@location(0) position: vec3<f32>,
+}
+
+struct ExtendedVertexInput {
 	@location(1) texcoords: vec2<f32>,
 	@location(2) normal: vec2<f32>,
 }
@@ -23,7 +26,8 @@ struct InstanceInput {
 
 @vertex
 fn vs_main(
-	model: VertexInput,
+	vertex_basic: BasicVertexInput,
+	vertex_extended: ExtendedVertexInput,
 	instance: InstanceInput,
 ) -> VertexOutput {
 	
@@ -35,8 +39,8 @@ fn vs_main(
 	);
 	
 	var out: VertexOutput;
-	out.texcoords = model.texcoords;
-	out.pos = camera_data.proj_view_mat * model_mat * vec4<f32>(model.position, 1.0);
+	out.texcoords = vertex_extended.texcoords;
+	out.pos = camera_data.proj_view_mat * model_mat * vec4<f32>(vertex_basic.position, 1.0);
 	out.pos.z = out.pos.z * 0.5 + 0.25;
 	return out;
 }

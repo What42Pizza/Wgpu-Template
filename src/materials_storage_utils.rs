@@ -18,7 +18,7 @@ pub fn insert_material_2d(
 	generic_bind_layouts: &GenericBindLayouts,
 ) -> Result<MaterialId> {
 	let output = materials_storage.list_2d.len();
-	let material = load_material_2d(path, render_context, &generic_bind_layouts.texture_2d)?;
+	let material = load_material_2d(path, render_context, &generic_bind_layouts.texture_2d).context("Failed to load material_2d.")?;
 	materials_storage.list_2d.push(material);
 	Ok(output)
 }
@@ -30,7 +30,7 @@ pub fn insert_material_cube(
 	generic_bind_layouts: &GenericBindLayouts,
 ) -> Result<MaterialId> {
 	let output = materials_storage.list_cube.len();
-	let material = load_material_cube(path, render_context, &generic_bind_layouts.texture_cube)?;
+	let material = load_material_cube(path, render_context, &generic_bind_layouts.texture_cube).context("Failed to load material_cube")?;
 	materials_storage.list_cube.push(material);
 	Ok(output)
 }
@@ -47,8 +47,8 @@ pub fn load_material_2d(
 ) -> Result<MaterialRenderData> {
 	let path = path.into();
 	
-	let raw_texture_bytes = fs::read(utils::get_program_file_path(&path))?;
-	let texture_bytes = image::load_from_memory(&raw_texture_bytes)?;
+	let raw_texture_bytes = fs::read(utils::get_program_file_path(&path)).add_path_to_error(&path)?;
+	let texture_bytes = image::load_from_memory(&raw_texture_bytes).context("Failed to decode texture.")?;
 	let texture_bytes = texture_bytes.to_rgba8();
 	let dimensions = texture_bytes.dimensions();
 	
@@ -128,8 +128,8 @@ pub fn load_material_cube(
 ) -> Result<MaterialRenderData> {
 	let path = path.into();
 	
-	let raw_texture_bytes = fs::read(utils::get_program_file_path(&path))?;
-	let texture_bytes = image::load_from_memory(&raw_texture_bytes)?;
+	let raw_texture_bytes = fs::read(utils::get_program_file_path(&path)).add_path_to_error(&path)?;
+	let texture_bytes = image::load_from_memory(&raw_texture_bytes).context("Failed to decode texture.")?;
 	let texture_bytes = texture_bytes.to_rgba8();
 	let dimensions = texture_bytes.dimensions();
 	let dimensions = (dimensions.0, dimensions.1 / 6);

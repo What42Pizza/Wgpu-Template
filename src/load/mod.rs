@@ -18,7 +18,7 @@ pub use load_pipelines::*;
 
 pub fn load_program_data(start_time: Instant, window: &Window) -> Result<ProgramData> {
 	
-	let engine_config = load_engine_config()?;
+	let engine_config = load_engine_config().context("Failed to load engine config.")?;
 	
 	// app data
 	let camera_data = CameraData::new((0., 1., 2.));
@@ -60,11 +60,11 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 pub fn load_engine_config() -> Result<EngineConfig> {
 	
 	let engine_config_path = utils::get_program_file_path("engine config.hjson");
-	let engine_config_result = fs::read_to_string(engine_config_path);
+	let engine_config_result = fs::read_to_string(&engine_config_path);
 	let engine_config_string = match &engine_config_result {
 		StdResult::Ok(v) => &**v,
 		StdResult::Err(err) => {
-			warn!("Failed to read 'engine config.hjson', using default values...  (error: {err})");
+			warn!("Failed to read 'engine config.hjson' (full path: {engine_config_path:?}), using default values...  (error: {err})");
 			include_str!("../../data/default engine config.hjson")
 		}
 	};
@@ -172,7 +172,7 @@ pub async fn load_render_context_data_async<'a>(window: &'a Window, engine_confi
 	});
 	
 	// Handle to a presentable surface
-	let surface = instance.create_surface(window)?;
+	let surface = instance.create_surface(window).context("Failed to create drawable surface for window.")?;
 	
 	// Handle to a physical graphics and/or compute device
 	let mut adapter = instance.request_adapter(
@@ -198,7 +198,7 @@ pub async fn load_render_context_data_async<'a>(window: &'a Window, engine_confi
 			label: None,
 		},
 		None,
-	).await?;
+	).await.context("Failed to create connection to gpu.")?;
 	
 	let surface_caps = surface.get_capabilities(&adapter);
 	let surface_format = surface_caps.formats.iter()

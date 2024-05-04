@@ -13,11 +13,11 @@ pub fn load_render_assets(
 ) -> Result<RenderAssets> {
 	
 	let mut materials_storage = MaterialsStorage::new();
-	let example_model = load_example_model_render_data(render_context, generic_bind_layouts, &mut materials_storage)?;
-	let skybox_material_index = load_skybox_material(render_context, generic_bind_layouts, &mut materials_storage)?;
-	let depth = load_depth_render_data(render_context)?;
-	let shadow_caster = load_shadow_caster_data(render_context, shadowmap_size, shadow_caster_data)?;
-	let camera = load_camera_render_data(render_context, camera_data)?;
+	let example_model = load_example_model_render_data(render_context, generic_bind_layouts, &mut materials_storage).context("Failed to load model render data.")?;
+	let skybox_material_index = load_skybox_material(render_context, generic_bind_layouts, &mut materials_storage).context("Failed to load skybox render data.")?;
+	let depth = load_depth_render_data(render_context);
+	let shadow_caster = load_shadow_caster_data(render_context, shadowmap_size, shadow_caster_data).context("Failed to load shader caster render data.")?;
+	let camera = load_camera_render_data(render_context, camera_data).context("Failed to load camera render data.")?;
 	
 	Ok(RenderAssets {
 		materials_storage,
@@ -83,12 +83,12 @@ pub fn load_model(
 	materials_storage: &mut MaterialsStorage,
 ) -> Result<Vec<MeshRenderData>> {
 	let file_path = file_path.as_ref();
-	let obj_text = fs::read_to_string(file_path)?;
+	let obj_text = fs::read_to_string(file_path).add_path_to_error(&file_path)?;
 	let obj_cursor = Cursor::new(obj_text);
 	let mut obj_reader = BufReader::new(obj_cursor);
 	let parent_folder = file_path.parent().expect("Cannot load mesh at root directory");
 	
-	let (models, obj_materials) = tobj::load_obj_buf(
+	let (models, model_materials) = tobj::load_obj_buf(
 		&mut obj_reader,
 		&tobj::LoadOptions {
 			triangulate: true,
@@ -96,14 +96,17 @@ pub fn load_model(
 			..Default::default()
 		},
 		move |p| {
-			let mat_text = fs::read_to_string(parent_folder.join(p)).map_err(|_err| tobj::LoadError::OpenFileFailed)?;
+			let mat_text =
+				fs::read_to_string(parent_folder.join(p))
+				//.add_path_to_error(&file_path) // this would just be thrown away in the next map_err()
+				.map_err(|_err| tobj::LoadError::OpenFileFailed)?;
 			tobj::load_mtl_buf(&mut BufReader::new(Cursor::new(mat_text)))
 		}
-	)?;
-	let obj_materials = obj_materials?;
+	).context("Failed to decode model data.")?;
+	let model_materials = model_materials.context("Failed to read model materials")?;
 	
 	let mut material_ids = Vec::new();
-	for material in obj_materials {
+	for material in model_materials {
 		let Some(diffuse_texture_name) = material.diffuse_texture else {
 			warn!("diffuse texture in material is `None`.");
 			continue;
@@ -119,25 +122,35 @@ pub fn load_model(
 	let meshes = models
 		.into_iter()
 		.map(|model| {
-			let vertices = (0..model.mesh.positions.len() / 3)
-				.map(|i| GenericVertex {
+			let pos_count = model.mesh.positions.len() / 3;
+			let mut basic_vertices = Vec::with_capacity(pos_count);
+			let mut extended_vertices = Vec::with_capacity(pos_count);
+			for i in 0..pos_count {
+				basic_vertices.push(BasicVertexData {
 					position: [
 						model.mesh.positions[i * 3],
 						model.mesh.positions[i * 3 + 1],
 						model.mesh.positions[i * 3 + 2],
 					],
+				});
+				extended_vertices.push(ExtendedVertexData {
 					tex_coords: [model.mesh.texcoords[i * 2], 1.0 - model.mesh.texcoords[i * 2 + 1]],
 					normal: [
 						model.mesh.normals[i * 3],
 						model.mesh.normals[i * 3 + 1],
 						model.mesh.normals[i * 3 + 2],
 					],
-				})
-				.collect::<Vec<_>>();
+				});
+			}
 			
-			let vertex_buffer = render_context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-				label: Some(&format!("{:?} Vertex Buffer", &file_path)),
-				contents: bytemuck::cast_slice(&vertices),
+			let basic_vertex_buffer = render_context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+				label: Some(&format!("{:?} Basic Vertex Buffer", &file_path)),
+				contents: bytemuck::cast_slice(&basic_vertices),
+				usage: wgpu::BufferUsages::VERTEX,
+			});
+			let extended_vertex_buffer = render_context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+				label: Some(&format!("{:?} Extended Vertex Buffer", &file_path)),
+				contents: bytemuck::cast_slice(&extended_vertices),
 				usage: wgpu::BufferUsages::VERTEX,
 			});
 			let index_buffer = render_context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -147,7 +160,8 @@ pub fn load_model(
 			});
 			
 			MeshRenderData {
-				vertex_buffer,
+				basic_vertex_buffer,
+				extended_vertex_buffer,
 				index_buffer,
 				index_count: model.mesh.indices.len() as u32,
 				material_id: material_ids[model.mesh.material_id.unwrap_or(0)],
@@ -168,7 +182,7 @@ pub fn load_skybox_material(render_context: &RenderContextData, generic_bind_lay
 
 
 
-pub fn load_depth_render_data(render_context: &RenderContextData) -> Result<DepthRenderData> {
+pub fn load_depth_render_data(render_context: &RenderContextData) -> DepthRenderData {
 	
 	let size = wgpu::Extent3d {
 		width: render_context.surface_config.width,
@@ -189,9 +203,9 @@ pub fn load_depth_render_data(render_context: &RenderContextData) -> Result<Dept
 	
 	let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 	
-	Ok(DepthRenderData {
+	DepthRenderData {
 		view,
-	})
+	}
 }
 
 

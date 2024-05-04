@@ -53,7 +53,7 @@ pub fn render_shadowmap_pipeline(program_data: &ProgramData, encoder: &mut wgpu:
 	shadowmap_pass_handle.set_bind_group(1, &render_assets.materials_storage.list_2d[render_assets.example_models.meshes[0].material_id].bind_group, &[]);
 	
 	let mesh = &render_assets.example_models.meshes[0];
-	shadowmap_pass_handle.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+	shadowmap_pass_handle.set_vertex_buffer(0, mesh.basic_vertex_buffer.slice(..));
 	shadowmap_pass_handle.set_vertex_buffer(1, render_assets.example_models.instances_buffer.slice(..));
 	shadowmap_pass_handle.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
 	shadowmap_pass_handle.draw_indexed(0..mesh.index_count, 0, 0..render_assets.example_models.instances_count);
@@ -99,8 +99,9 @@ pub fn render_example_pipeline(program_data: &ProgramData, encoder: &mut wgpu::C
 	example_pass_handle.set_bind_group(1, &render_assets.materials_storage.list_2d[render_assets.example_models.meshes[0].material_id].bind_group, &[]);
 	
 	let mesh = &render_assets.example_models.meshes[0];
-	example_pass_handle.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
-	example_pass_handle.set_vertex_buffer(1, render_assets.example_models.instances_buffer.slice(..));
+	example_pass_handle.set_vertex_buffer(0, mesh.basic_vertex_buffer.slice(..));
+	example_pass_handle.set_vertex_buffer(1, mesh.extended_vertex_buffer.slice(..));
+	example_pass_handle.set_vertex_buffer(2, render_assets.example_models.instances_buffer.slice(..));
 	example_pass_handle.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
 	example_pass_handle.draw_indexed(0..mesh.index_count, 0, 0..render_assets.example_models.instances_count);
 	

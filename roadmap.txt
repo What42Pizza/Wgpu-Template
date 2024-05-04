@@ -8,6 +8,7 @@ gui system
 text rendering
 texture compression?
 physics engine integration
+localization?
 
 for later projects:
 terrain generation

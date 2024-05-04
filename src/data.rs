@@ -215,7 +215,8 @@ pub struct ModelsRenderData {
 }
 
 pub struct MeshRenderData {
-	pub vertex_buffer: wgpu::Buffer,
+	pub basic_vertex_buffer: wgpu::Buffer,
+	pub extended_vertex_buffer: wgpu::Buffer,
 	pub index_buffer: wgpu::Buffer,
 	pub index_count: u32,
 	pub material_id: MaterialId,
@@ -258,15 +259,35 @@ pub struct RenderPipelines {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct GenericVertex {
+pub struct BasicVertexData {
 	pub position: [f32; 3],
+}
+
+impl BasicVertexData {
+	pub const ATTRIBUTES: [wgpu::VertexAttribute; 1] = wgpu::vertex_attr_array![
+		0 => Float32x3,
+	];
+	pub const fn get_layout() -> wgpu::VertexBufferLayout<'static> {
+		wgpu::VertexBufferLayout {
+			array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
+			step_mode: wgpu::VertexStepMode::Vertex,
+			attributes: &Self::ATTRIBUTES,
+		}
+	}
+}
+
+
+
+// NOTE: 'extended' here means more advanced, having more data
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct ExtendedVertexData {
 	pub tex_coords: [f32; 2],
 	pub normal: [f32; 3],
 }
 
-impl GenericVertex {
-	pub const ATTRIBUTES: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
-		0 => Float32x3,
+impl ExtendedVertexData {
+	pub const ATTRIBUTES: [wgpu::VertexAttribute; 2] = wgpu::vertex_attr_array![
 		1 => Float32x2,
 		2 => Float32x3,
 	];

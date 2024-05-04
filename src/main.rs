@@ -30,7 +30,7 @@ pub mod materials_storage_utils;
 pub mod utils;
 
 pub mod prelude {
-	pub use crate::{*, data::*};
+	pub use crate::{*, data::*, utils::IoResultFns};
 	pub use std::{
 		fs,
 		collections::HashMap,
@@ -71,7 +71,7 @@ fn main() -> Result<()> {
 	// event loop until we can get a window, then use that to create the application
 	// struct, then use that to start the event loop
 	info!("Running initialization event_loop...");
-	let mut event_loop = EventLoop::new()?;
+	let mut event_loop = EventLoop::new().context("Failed to create event loop.")?;
 	let mut init_data = InitData::default();
 	let window = loop {
 		event_loop.pump_app_events(None, &mut init_data);
@@ -200,7 +200,7 @@ pub fn resize(program_data: &mut ProgramData, new_size: PhysicalSize<u32>) -> Re
 	render_context.surface_config.height = new_size.height;
 	if new_size.width == 0 || new_size.height == 0 {return Ok(());}
 	render_context.drawable_surface.configure(&render_context.device, &render_context.surface_config);
-	program_data.render_assets.depth = load::load_depth_render_data(render_context)?;
+	program_data.render_assets.depth = load::load_depth_render_data(render_context);
 	Ok(())
 }
 
@@ -233,12 +233,12 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 			StdResult::Err(wgpu::SurfaceError::Lost) => {
 				warn!("Surface was lost, attempting to resize...");
 				resize(program_data, render_context.surface_size).context("Failed to resize window.")?;
-				program_data.render_context.drawable_surface.get_current_texture()?
+				program_data.render_context.drawable_surface.get_current_texture().context("Failed to get current window drawable texture, even after resize.")?
 			}
 			StdResult::Err(wgpu::SurfaceError::Outdated) => {
 				warn!("Surface is outdated, attempting to resize...");
 				resize(program_data, render_context.surface_size).context("Failed to resize window.")?;
-				program_data.render_context.drawable_surface.get_current_texture()?
+				program_data.render_context.drawable_surface.get_current_texture().context("Failed to get current window drawable texture, even after resize.")?
 			}
 			StdResult::Err(wgpu::SurfaceError::OutOfMemory) => {
 				warn!("OutOfMemory error while rendering, exiting process.");
@@ -260,7 +260,7 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 		
 		let fps_counter_output = program_data.fps_counter.step(frame_start_time.elapsed());
 		if let Some((average_fps, average_frame_time)) = fps_counter_output {
-			info!("FPS: {average_fps}  (avg frame time: {average_frame_time:?})");
+			println!("FPS: {average_fps}  (avg frame time: {average_frame_time:?})");
 		}
 		
 		

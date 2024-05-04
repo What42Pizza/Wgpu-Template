@@ -23,6 +23,7 @@ This is a template for using Rust + Winit + Wgpu to build native desktop program
 - **Simple, but Upfront** &nbsp; everything has the most straight-forward implementation I could think of, but none of the complexity is trying to be hidden
 - **Well Documented** &nbsp; self-documented wherever possible, with comments to explain any oddities
 - **Up-to-date Dependencies** &nbsp; uses the latest crates available, at least at the time of writing this
+- **Thorough Error Handling**
 
 <br>
 

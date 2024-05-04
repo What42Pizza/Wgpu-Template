@@ -4,9 +4,9 @@ use crate::prelude::*;
 
 pub fn load_render_pipelines(render_context: &RenderContextData, generic_bind_layouts: &GenericBindLayouts, render_assets: &RenderAssets) -> Result<RenderPipelines> {
 	
-	let shadowmap = load_shadowmap_render_pipeline(&render_assets.camera.bind_layout, render_context)?;
-	let example_model = load_example_model_render_pipeline(&render_assets.camera.bind_layout, generic_bind_layouts, render_context)?;
-	let skybox = load_skybox_render_pipeline(&render_assets.camera.bind_layout, generic_bind_layouts, render_context)?;
+	let shadowmap = load_shadowmap_render_pipeline(&render_assets.camera.bind_layout, render_context).context("Failed to load shadowmap render pipeline.")?;
+	let example_model = load_example_model_render_pipeline(&render_assets.camera.bind_layout, generic_bind_layouts, render_context).context("Failed to load example model render pipeline.")?;
+	let skybox = load_skybox_render_pipeline(&render_assets.camera.bind_layout, generic_bind_layouts, render_context).context("Failed to load skybox render pipeline.")?;
 	
 	Ok(RenderPipelines {
 		shadowmap,
@@ -24,7 +24,8 @@ pub fn load_shadowmap_render_pipeline(
 	render_context: &RenderContextData,
 ) -> Result<wgpu::RenderPipeline> {
 	
-	let shader_source = fs::read_to_string(utils::get_program_file_path("shaders/shadowmap.wgsl"))?;
+	let shader_path = utils::get_program_file_path("shaders/shadowmap.wgsl");
+	let shader_source = fs::read_to_string(&shader_path).add_path_to_error(&shader_path)?;
 	let shader = render_context.device.create_shader_module(wgpu::ShaderModuleDescriptor {
 		label: Some("Shadowmap Render Pipeline"),
 		source: wgpu::ShaderSource::Wgsl(shader_source.into()),
@@ -45,7 +46,7 @@ pub fn load_shadowmap_render_pipeline(
 			module: &shader,
 			entry_point: "vs_main",
 			buffers: &[
-				GenericVertex::get_layout(),
+				BasicVertexData::get_layout(),
 				RawInstanceData::get_layout()
 			],
 			compilation_options: wgpu::PipelineCompilationOptions::default(),
@@ -92,7 +93,8 @@ pub fn load_example_model_render_pipeline(
 	render_context: &RenderContextData,
 ) -> Result<wgpu::RenderPipeline> {
 	
-	let shader_source = fs::read_to_string(utils::get_program_file_path("shaders/example.wgsl"))?;
+	let shader_path = utils::get_program_file_path("shaders/example.wgsl");
+	let shader_source = fs::read_to_string(&shader_path).add_path_to_error(&shader_path)?;
 	let shader = render_context.device.create_shader_module(wgpu::ShaderModuleDescriptor {
 		label: Some("Example Render Pipeline"),
 		source: wgpu::ShaderSource::Wgsl(shader_source.into()),
@@ -114,8 +116,9 @@ pub fn load_example_model_render_pipeline(
 			module: &shader,
 			entry_point: "vs_main",
 			buffers: &[
-				GenericVertex::get_layout(),
-				RawInstanceData::get_layout()
+				BasicVertexData::get_layout(),
+				ExtendedVertexData::get_layout(),
+				RawInstanceData::get_layout(),
 			],
 			compilation_options: wgpu::PipelineCompilationOptions::default(),
 		},
@@ -166,7 +169,8 @@ pub fn load_skybox_render_pipeline(
 	render_context: &RenderContextData,
 ) -> Result<wgpu::RenderPipeline> {
 	
-	let shader_source = fs::read_to_string(utils::get_program_file_path("shaders/skybox.wgsl"))?;
+	let shader_path = utils::get_program_file_path("shaders/skybox.wgsl");
+	let shader_source = fs::read_to_string(&shader_path).add_path_to_error(&shader_path)?;
 	let shader = render_context.device.create_shader_module(wgpu::ShaderModuleDescriptor {
 		label: Some("Skybox Render Pipeline"),
 		source: wgpu::ShaderSource::Wgsl(shader_source.into()),
