@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use async_std::task::block_on;
-use winit::window::Window;
+use winit::{dpi::PhysicalPosition, window::Window};
 use serde_hjson::{Map, Value};
 
 
@@ -19,6 +19,13 @@ pub use load_pipelines::*;
 pub fn load_program_data(start_time: Instant, window: &Window) -> Result<ProgramData> {
 	
 	let engine_config = load_engine_config().context("Failed to load engine config.")?;
+	let input = EngineInput {
+		pressed_keys: HashSet::new(),
+		prev_pressed_keys: HashSet::new(),
+		is_focused: false,
+		mouse_pos: PhysicalPosition::new(0.0, 0.0),
+		prev_mouse_pos: PhysicalPosition::new(0.0, 0.0),
+	};
 	
 	// app data
 	let camera_data = CameraData::new((0., 1., 2.));
@@ -36,7 +43,7 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 		// engine data
 		start_time,
 		engine_config,
-		pressed_keys: HashMap::new(),
+		input,
 		
 		// app data
 		camera_data,

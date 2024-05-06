@@ -1,9 +1,9 @@
 // Started:      24/04/18
-// Last updated: 24/05/03
+// Last updated: 24/05/05
 
 // Learn Wgpu website: https://sotrh.github.io/learn-wgpu/
 // Learn Wgpu repo: https://github.com/sotrh/learn-wgpu
-// Skybox source: https://opengameart.org/content/clouds-skybox-1
+// Skybox texture: https://opengameart.org/content/clouds-skybox-1
 
 
 
@@ -33,7 +33,7 @@ pub mod prelude {
 	pub use crate::{*, data::*, utils::IoResultFns};
 	pub use std::{
 		fs,
-		collections::HashMap,
+		collections::{HashMap, HashSet},
 		path::{Path, PathBuf},
 		time::{Duration, Instant}
 	};
@@ -91,7 +91,7 @@ fn main() -> Result<()> {
 
 
 
-// the entire purpose of this is to get a usable window
+// the entire purpose of this part is to get a usable window
 
 #[derive(Default)]
 pub struct InitData {
@@ -150,9 +150,25 @@ impl<'a> ApplicationHandler for ProgramData<'a> {
 		
 		match event {
 			
+			WindowEvent::RedrawRequested => {
+				let result = redraw_requested(program_data, event_loop);
+				if let Err(err) = result {
+					error!("Fatal error while processing frame: {err}");
+					event_loop.exit();
+				}
+			}
+			
+			WindowEvent::Resized (new_size) => {
+				resize(program_data, new_size).expect("Failed to resize the window");
+			}
+			
 			WindowEvent::CloseRequested => {
 				event_loop.exit();
-			},
+			}
+			
+			WindowEvent::Focused (is_focused) => {
+				program_data.input.is_focused = is_focused;
+			}
 			
 			WindowEvent::KeyboardInput {
 				event: KeyEvent {
@@ -162,19 +178,15 @@ impl<'a> ApplicationHandler for ProgramData<'a> {
 				},
 				..
 			} => {
-				program_data.pressed_keys.insert(key, state.is_pressed());
-			},
-			
-			WindowEvent::RedrawRequested => {
-				let result = redraw_requested(program_data, event_loop);
-				if let Err(err) = result {
-					error!("Fatal error while processing frame: {err}");
-					event_loop.exit();
+				if state.is_pressed() {
+					program_data.input.pressed_keys.insert(key);
+				} else {
+					program_data.input.pressed_keys.remove(&key);
 				}
-			},
+			}
 			
-			WindowEvent::Resized (new_size) => {
-				resize(program_data, new_size).expect("Failed to resize the window");
+			WindowEvent::CursorMoved {device_id: _, position} => {
+				program_data.input.mouse_pos = position;
 			}
 			
 			_ => (),
@@ -266,6 +278,10 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 		
 		program_data.render_context.window.pre_present_notify();
 		surface_output.present();
+		
+		let input = &mut program_data.input;
+		input.prev_mouse_pos = input.mouse_pos;
+		input.prev_pressed_keys = input.pressed_keys.clone();
 		
 		
 	}

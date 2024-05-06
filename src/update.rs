@@ -7,11 +7,13 @@ pub type ShouldExit = bool;
 
 pub fn update(program_data: &mut ProgramData, dt: f32) -> Result<ShouldExit> {
 	
-	if program_data.key_is_down(KeyCode::Escape) {
+	if program_data.input.key_just_pressed(KeyCode::Escape) {
 		return Ok(true);
 	}
 	
-	update_camera(program_data, dt);
+	//if program_data.input.is_focused {
+		update_camera(program_data, dt);
+	//}
 	
 	update_gpu_buffers(program_data);
 	
@@ -21,31 +23,46 @@ pub fn update(program_data: &mut ProgramData, dt: f32) -> Result<ShouldExit> {
 
 
 fn update_camera(program_data: &mut ProgramData, dt: f32) {
+	let input = &program_data.input;
+	let camera_data = &mut program_data.camera_data;
 	let speed = 30.0 * dt;
-	let forward = program_data.camera_data.target - program_data.camera_data.eye;
+	let forward = glam::Vec3::new(
+		camera_data.rot_xz.cos() * camera_data.rot_y.cos(),
+		camera_data.rot_y.sin(),
+		camera_data.rot_xz.sin() * camera_data.rot_y.cos(),
+	);
 	let forward_dir = forward.normalize();
-	let right_dir = forward_dir.cross(program_data.camera_data.up);
+	let right_dir = forward_dir.cross(glam::Vec3::Y);
 	
-	if program_data.key_is_down(KeyCode::KeyW) && speed < forward.length() {
-		program_data.camera_data.eye += forward_dir * speed;
+	if input.key_is_down(KeyCode::KeyW) {
+		camera_data.pos += forward_dir * speed;
 	}
-	if program_data.key_is_down(KeyCode::KeyS) {
-		program_data.camera_data.eye -= forward_dir * speed;
-	}
-	
-	if program_data.key_is_down(KeyCode::KeyD) {
-		program_data.camera_data.eye += right_dir * speed;
-	}
-	if program_data.key_is_down(KeyCode::KeyA) {
-		program_data.camera_data.eye -= right_dir * speed;
+	if input.key_is_down(KeyCode::KeyS) {
+		camera_data.pos -= forward_dir * speed;
 	}
 	
-	if program_data.key_is_down(KeyCode::KeyE) {
-		program_data.camera_data.eye.y += speed;
+	if input.key_is_down(KeyCode::KeyD) {
+		camera_data.pos += right_dir * speed;
 	}
-	if program_data.key_is_down(KeyCode::KeyQ) {
-		program_data.camera_data.eye.y -= speed;
+	if input.key_is_down(KeyCode::KeyA) {
+		camera_data.pos -= right_dir * speed;
 	}
+	
+	if input.key_is_down(KeyCode::KeyE) {
+		camera_data.pos.y += speed;
+	}
+	if input.key_is_down(KeyCode::KeyQ) {
+		camera_data.pos.y -= speed;
+	}
+	
+	let sensitivity = 0.005;
+	let mouse_dt = (
+		(input.mouse_pos.x - input.prev_mouse_pos.x).clamp(-50.0, 50.0) as f32 * sensitivity,
+		(input.mouse_pos.y - input.prev_mouse_pos.y).clamp(-50.0, 50.0) as f32 * sensitivity,
+	);
+	camera_data.rot_xz += mouse_dt.0;
+	camera_data.rot_y = (camera_data.rot_y - mouse_dt.1).clamp(-std::f32::consts::FRAC_PI_2 * 0.999, std::f32::consts::FRAC_PI_2 * 0.999);
+	
 	
 }
 
@@ -60,16 +77,11 @@ pub fn update_gpu_buffers(program_data: &mut ProgramData) {
 		bytemuck::cast_slice(&camera_gpu_data),
 	);
 	
-	// this code isn't actually used right now, but it adds the ability to update the shadow projection matrix by setting `shader_caster_data.is_dirty`
-	let shadow_caster = &mut program_data.render_assets.shadow_caster;
-	if shadow_caster.is_dirty {
-		shadow_caster.is_dirty = false;
-		let shadow_caster_gpu_data = program_data.shadow_caster_data.build_gpu_data();
-		program_data.render_context.command_queue.write_buffer(
-			&program_data.render_assets.camera.buffer,
-			0,
-			bytemuck::cast_slice(&shadow_caster_gpu_data),
-		);
-	}
+	let shadow_caster_gpu_data = program_data.shadow_caster_data.build_gpu_data(program_data.camera_data.pos);
+	program_data.render_context.command_queue.write_buffer(
+		&program_data.render_assets.camera.buffer,
+		0,
+		bytemuck::cast_slice(&shadow_caster_gpu_data),
+	);
 	
 }

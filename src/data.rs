@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use winit::keyboard::KeyCode;
+use winit::{dpi::PhysicalPosition, keyboard::KeyCode};
 
 
 
@@ -8,7 +8,7 @@ pub struct ProgramData<'a> {
 	// engine data
 	pub start_time: Instant,
 	pub engine_config: EngineConfig,
-	pub pressed_keys: HashMap<KeyCode, bool>,
+	pub input: EngineInput,
 	
 	// app data
 	pub camera_data: CameraData,
@@ -25,9 +25,6 @@ pub struct ProgramData<'a> {
 }
 
 impl<'a> ProgramData<'a> {
-	pub fn key_is_down(&self, key: KeyCode) -> bool {
-		self.pressed_keys.get(&key).cloned().unwrap_or(false)
-	}
 	pub fn step_dt(&mut self) -> f32 {
 		let new_frame_instant = Instant::now();
 		let dt = (new_frame_instant - self.frame_start_instant).as_secs_f32();
@@ -50,12 +47,31 @@ pub struct EngineConfig {
 
 
 
+pub struct EngineInput {
+	pub pressed_keys: HashSet<KeyCode>,
+	pub prev_pressed_keys: HashSet<KeyCode>,
+	pub is_focused: bool,
+	pub mouse_pos: PhysicalPosition<f64>,
+	pub prev_mouse_pos: PhysicalPosition<f64>,
+}
+
+impl EngineInput {
+	pub fn key_is_down(&self, key: KeyCode) -> bool {
+		self.pressed_keys.contains(&key)
+	}
+	pub fn key_just_pressed(&self, key: KeyCode) -> bool {
+		self.pressed_keys.contains(&key) && !self.prev_pressed_keys.contains(&key)
+	}
+}
+
+
+
 
 
 pub struct CameraData {
-	pub eye: glam::Vec3,
-	pub target: glam::Vec3,
-	pub up: glam::Vec3,
+	pub pos: glam::Vec3,
+	pub rot_xz: f32,
+	pub rot_y: f32,
 	pub fov: f32,
 	pub near: f32,
 	pub far: f32,
@@ -73,9 +89,14 @@ impl CameraData {
 	//	0.0, 0.0, 0.5, 0.5,
 	//	0.0, 0.0, 0.0, 1.0,
 	//]);
-	pub fn build_gpu_data(&self, aspect_ratio: f32) -> [f32; 16 + 16 +16] {
+	pub fn build_gpu_data(&self, aspect_ratio: f32) -> [f32; 16 + 16 + 16] {
         let proj = glam::Mat4::perspective_rh(self.fov, aspect_ratio, 1.0, 50.0);
-        let view = glam::Mat4::look_at_rh(self.eye, self.target, self.up);
+		let target = self.pos + glam::Vec3::new(
+            self.rot_xz.cos() * self.rot_y.cos(),
+            self.rot_y.sin(),
+            self.rot_xz.sin() * self.rot_y.cos(),
+		);
+        let view = glam::Mat4::look_at_rh(self.pos, target, glam::Vec3::Y);
         let inv_proj = proj.inverse();
 		let proj_view = proj * view;
 		let mut output = [0f32; 16 + 16 + 16];
@@ -84,14 +105,11 @@ impl CameraData {
 		output[32..48].copy_from_slice(&view.to_cols_array());
 		output
 	}
-	//pub fn default_data() -> [f32; 16 + 16 + 16] {
-	//	[0.0; 16 + 16 + 16]
-	//}
 	pub fn new(pos: (f32, f32, f32)) -> Self {
 		Self {
-			eye: pos.into(),
-			target: (0.0, 0.0, 0.0).into(),
-			up: glam::Vec3::Y,
+			pos: pos.into(),
+			rot_xz: 0.0,
+			rot_y: 0.0,
 			fov: 45.0,
 			near: 0.1,
 			far: 100.0,
@@ -102,19 +120,21 @@ impl CameraData {
 
 
 pub struct ShadowCasterData {
-	pub pos: glam::Quat,
+	pub size: glam::Vec3,
+	pub rot: glam::Quat,
 }
 
 impl ShadowCasterData {
-	pub fn build_gpu_data(&self) -> [f32; 16] {
-		glam::Mat4::look_at_rh(self.pos.xyz(), glam::Vec3::ZERO, glam::Vec3::Y).to_cols_array() // I have no clue if this is correct
+	pub fn build_gpu_data(&self, center_pos: glam::Vec3) -> [f32; 16] {
+		glam::Mat4::from_scale_rotation_translation(self.size, self.rot, center_pos).to_cols_array()
 	}
 }
 
 impl Default for ShadowCasterData {
 	fn default() -> Self {
 		Self {
-			pos: glam::Quat::from_euler(glam::EulerRot::ZXY, std::f32::consts::PI * 0.25, std::f32::consts::PI * 0.25, 0.0)
+			size: glam::Vec3::new(100.0, 100.0, 100.0),
+			rot: glam::Quat::from_euler(glam::EulerRot::ZXY, std::f32::consts::PI * 0.25, std::f32::consts::PI * 0.25, 0.0),
 		}
 	}
 }
@@ -230,8 +250,9 @@ pub struct DepthRenderData {
 }
 
 pub struct ShadowCasterRenderData {
-	pub is_dirty: bool, // this is the only struct with an `is_dirty` field because it's the only struct which conditionally needs updating
 	pub depth_tex_view: wgpu::TextureView,
+	pub depth_tex_layout: wgpu::BindGroupLayout,
+	pub depth_tex_group: wgpu::BindGroup,
 	pub proj_mat_buffer: wgpu::Buffer,
 	pub proj_mat_layout: wgpu::BindGroupLayout,
 	pub proj_mat_group: wgpu::BindGroup,

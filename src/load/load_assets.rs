@@ -16,7 +16,7 @@ pub fn load_render_assets(
 	let example_model = load_example_model_render_data(render_context, generic_bind_layouts, &mut materials_storage).context("Failed to load model render data.")?;
 	let skybox_material_index = load_skybox_material(render_context, generic_bind_layouts, &mut materials_storage).context("Failed to load skybox render data.")?;
 	let depth = load_depth_render_data(render_context);
-	let shadow_caster = load_shadow_caster_data(render_context, shadowmap_size, shadow_caster_data).context("Failed to load shader caster render data.")?;
+	let shadow_caster = load_shadow_caster_data(render_context, shadowmap_size, shadow_caster_data, camera_data).context("Failed to load shader caster render data.")?;
 	let camera = load_camera_render_data(render_context, camera_data).context("Failed to load camera render data.")?;
 	
 	Ok(RenderAssets {
@@ -212,7 +212,7 @@ pub fn load_depth_render_data(render_context: &RenderContextData) -> DepthRender
 
 
 
-pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_size: u32, shadow_caster_data: &ShadowCasterData) -> Result<ShadowCasterRenderData> {
+pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_size: u32, shadow_caster_data: &ShadowCasterData, camera_data: &CameraData) -> Result<ShadowCasterRenderData> {
 	
 	let size = wgpu::Extent3d {
 		width: shadowmap_size,
@@ -231,12 +231,59 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 	};
 	let depth_texture = render_context.device.create_texture(&desc);
 	let depth_tex_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
+	let depth_tex_sampler = render_context.device.create_sampler(&wgpu::SamplerDescriptor {
+		address_mode_u: wgpu::AddressMode::ClampToEdge,
+		address_mode_v: wgpu::AddressMode::ClampToEdge,
+		address_mode_w: wgpu::AddressMode::ClampToEdge,
+		mag_filter: wgpu::FilterMode::Linear,
+		min_filter: wgpu::FilterMode::Linear,
+		mipmap_filter: wgpu::FilterMode::Nearest,
+		compare: Some(wgpu::CompareFunction::LessEqual),
+		..Default::default()
+	});
+	
+	let depth_tex_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+		entries: &[
+			wgpu::BindGroupLayoutEntry { // texture view
+				binding: 0,
+				visibility: wgpu::ShaderStages::FRAGMENT,
+				ty: wgpu::BindingType::Texture {
+					multisampled: false,
+					view_dimension: wgpu::TextureViewDimension::D2,
+					sample_type: wgpu::TextureSampleType::Depth,
+				},
+				count: None,
+			},
+			wgpu::BindGroupLayoutEntry { // sampler
+				binding: 1,
+				visibility: wgpu::ShaderStages::FRAGMENT,
+				ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
+				count: None,
+			},
+		],
+		label: Some("shadow_caster_depth_tex_bind_layout"),
+	});
+	
+	let depth_tex_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
+		layout: &depth_tex_layout,
+		entries: &[
+			wgpu::BindGroupEntry { // texture view
+				binding: 0,
+				resource: wgpu::BindingResource::TextureView(&depth_tex_view),
+			},
+			wgpu::BindGroupEntry { // sampler
+				binding: 1,
+				resource: wgpu::BindingResource::Sampler(&depth_tex_sampler),
+			},
+		],
+		label: None,
+	});
 	
 	let proj_mat_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 		entries: &[
 			wgpu::BindGroupLayoutEntry { // proj_mat
 				binding: 0,
-				visibility: wgpu::ShaderStages::VERTEX,
+				visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
 				ty: wgpu::BindingType::Buffer {
 					ty: wgpu::BufferBindingType::Uniform,
 					has_dynamic_offset: false,
@@ -251,7 +298,7 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 	let proj_mat_buffer = render_context.device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
 			label: Some("Shadow Caster Buffer"),
-			contents: bytemuck::cast_slice(&shadow_caster_data.build_gpu_data()),
+			contents: bytemuck::cast_slice(&shadow_caster_data.build_gpu_data(camera_data.pos)),
 			usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
 		}
 	);
@@ -268,8 +315,9 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 	});
 	
 	Ok(ShadowCasterRenderData {
-		is_dirty: false,
 		depth_tex_view,
+		depth_tex_layout,
+		depth_tex_group,
 		proj_mat_buffer,
 		proj_mat_layout,
 		proj_mat_group,

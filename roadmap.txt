@@ -1,17 +1,17 @@
 shadows
+basic culling
 water
 post-processing
 	color correction
 	bloom
 	taa
-gui system
+gui system?
 text rendering
 texture compression?
-physics engine integration
-localization?
 
 for later projects:
 terrain generation
 tree generation
 player movement
-physics for player, vehicles, etc
+physics engine integration
+localization?
