@@ -79,7 +79,7 @@ pub fn update_gpu_buffers(program_data: &mut ProgramData) {
 	
 	let shadow_caster_gpu_data = program_data.shadow_caster_data.build_gpu_data(program_data.camera_data.pos);
 	program_data.render_context.command_queue.write_buffer(
-		&program_data.render_assets.camera.buffer,
+		&program_data.render_assets.shadow_caster.proj_mat_buffer,
 		0,
 		bytemuck::cast_slice(&shadow_caster_gpu_data),
 	);

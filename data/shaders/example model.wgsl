@@ -68,17 +68,18 @@ struct VertexOutput {
 fn sample_shadows(world_pos: vec3<f32>) -> f32 {
 	var shadowmap_pos = shadowmap_proj_mat * vec4<f32>(world_pos, 1.0);
 	shadowmap_pos = vec4<f32>(shadowmap_pos.xy * vec2<f32>(0.5, -0.5) + 0.5, shadowmap_pos.z, 1.0);
-    return textureSampleCompareLevel(shadowmap_texture, shadowmap_sampler, shadowmap_pos.xy, shadowmap_pos.z);
+	return textureSampleCompareLevel(shadowmap_texture, shadowmap_sampler, shadowmap_pos.xy, shadowmap_pos.z);
 }
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 	let color = textureSample(material_texture, material_sampler, in.texcoords);
-	let color_rgb = color.rgb;
+	var color_rgb = color.rgb;
 	let color_a = color.a;
 	
 	let ambient_light = vec3<f32>(0.9, 0.9, 1.0) * 0.5;
 	let shadowcaster_light = vec3<f32>(1.0, 1.0, 0.9) * sample_shadows(in.world_pos);
+	color_rgb *= ambient_light + shadowcaster_light;
 	
-	return vec4<f32>(color_rgb * (ambient_light + shadowcaster_light), color.a);
+	return vec4<f32>(color_rgb, color.a);
 }

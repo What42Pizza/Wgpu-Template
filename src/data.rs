@@ -110,7 +110,7 @@ impl CameraData {
 			pos: pos.into(),
 			rot_xz: 0.0,
 			rot_y: 0.0,
-			fov: 45.0,
+			fov: 70.0,
 			near: 0.1,
 			far: 100.0,
 		}
