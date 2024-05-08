@@ -36,4 +36,6 @@ I don't exactly expect others to want to use this, but it'll still be very usefu
 
 <br>
 
-#### License: [MIT](LICENSE)
+### License: [CC0](LICENSE)
+
+This license allows you to do anything you want with this code.
