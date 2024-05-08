@@ -16,7 +16,7 @@ pub fn load_render_assets(
 	let example_model = load_example_model_render_data(render_context, generic_bind_layouts, &mut materials_storage).context("Failed to load model render data.")?;
 	let skybox_material_index = load_skybox_material(render_context, generic_bind_layouts, &mut materials_storage).context("Failed to load skybox render data.")?;
 	let depth = load_depth_render_data(render_context);
-	let shadow_caster = load_shadow_caster_data(render_context, shadowmap_size, shadow_caster_data, camera_data).context("Failed to load shader caster render data.")?;
+	let shadow_caster = load_shadow_caster_data(render_context, shadowmap_size, shadow_caster_data, camera_data).context("Failed to load shadow caster render data.")?;
 	let camera = load_camera_render_data(render_context, camera_data).context("Failed to load camera render data.")?;
 	
 	Ok(RenderAssets {
@@ -230,7 +230,16 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 		view_formats: &[],
 	};
 	let depth_texture = render_context.device.create_texture(&desc);
-	let depth_tex_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
+	let depth_tex_view = depth_texture.create_view(&wgpu::TextureViewDescriptor {
+		label: None,
+		format: None,
+		dimension: Some(wgpu::TextureViewDimension::D2),
+		aspect: wgpu::TextureAspect::All,
+		base_mip_level: 0,
+		mip_level_count: None,
+		base_array_layer: 0,
+		array_layer_count: None,
+	});
 	let depth_tex_sampler = render_context.device.create_sampler(&wgpu::SamplerDescriptor {
 		address_mode_u: wgpu::AddressMode::ClampToEdge,
 		address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -239,6 +248,15 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 		min_filter: wgpu::FilterMode::Linear,
 		mipmap_filter: wgpu::FilterMode::Nearest,
 		compare: Some(wgpu::CompareFunction::LessEqual),
+		..Default::default()
+	});
+	let debug_depth_tex_sampler = render_context.device.create_sampler(&wgpu::SamplerDescriptor {
+		address_mode_u: wgpu::AddressMode::ClampToEdge,
+		address_mode_v: wgpu::AddressMode::ClampToEdge,
+		address_mode_w: wgpu::AddressMode::ClampToEdge,
+		mag_filter: wgpu::FilterMode::Linear,
+		min_filter: wgpu::FilterMode::Linear,
+		mipmap_filter: wgpu::FilterMode::Nearest,
 		..Default::default()
 	});
 	
@@ -257,7 +275,13 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 			wgpu::BindGroupLayoutEntry { // sampler
 				binding: 1,
 				visibility: wgpu::ShaderStages::FRAGMENT,
-				ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
+				ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Comparison),
+				count: None,
+			},
+			wgpu::BindGroupLayoutEntry { // debug sampler
+				binding: 2,
+				visibility: wgpu::ShaderStages::FRAGMENT,
+				ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Filtering),
 				count: None,
 			},
 		],
@@ -274,6 +298,10 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 			wgpu::BindGroupEntry { // sampler
 				binding: 1,
 				resource: wgpu::BindingResource::Sampler(&depth_tex_sampler),
+			},
+			wgpu::BindGroupEntry { // debug sampler
+				binding: 2,
+				resource: wgpu::BindingResource::Sampler(&debug_depth_tex_sampler),
 			},
 		],
 		label: None,

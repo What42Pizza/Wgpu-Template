@@ -104,7 +104,7 @@ pub fn load_material_2d(
 				binding: 0,
 				resource: wgpu::BindingResource::TextureView(&view),
 			},
-			wgpu::BindGroupEntry { // sampler
+			wgpu::BindGroupEntry { // texture sampler
 				binding: 1,
 				resource: wgpu::BindingResource::Sampler(&sampler),
 			},
@@ -189,7 +189,7 @@ pub fn load_material_cube(
 				binding: 0,
 				resource: wgpu::BindingResource::TextureView(&view),
 			},
-			wgpu::BindGroupEntry { // sampler
+			wgpu::BindGroupEntry { // texture sampler
 				binding: 1,
 				resource: wgpu::BindingResource::Sampler(&sampler),
 			},

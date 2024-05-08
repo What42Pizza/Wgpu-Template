@@ -82,7 +82,7 @@ impl CameraData {
 	// that `glam` (and similar crates) expect a z-range of -1 to 1 while wgpu expects a
 	// z-range of 0 to 1, but I haven't been able to integrate this matrix with the
 	// skybox code, and I've found that it's easier to just correct the z-range at the
-	// end of the vertex shaders (`pos.z = pos.z * 0.5 + 0.25`)
+	// end of the vertex shaders (`pos.z = pos.z * 0.5 + 0.5`)
 	//pub const OPENGL_TO_WGPU_MATRIX: glam::Mat4 = glam::Mat4::from_cols_array(&[
 	//	1.0, 0.0, 0.0, 0.0,
 	//	0.0, 1.0, 0.0, 0.0,
@@ -90,14 +90,14 @@ impl CameraData {
 	//	0.0, 0.0, 0.0, 1.0,
 	//]);
 	pub fn build_gpu_data(&self, aspect_ratio: f32) -> [f32; 16 + 16 + 16] {
-        let proj = glam::Mat4::perspective_rh(self.fov, aspect_ratio, 1.0, 50.0);
+		let proj = glam::Mat4::perspective_rh(self.fov, aspect_ratio, 1.0, 50.0);
 		let target = self.pos + glam::Vec3::new(
-            self.rot_xz.cos() * self.rot_y.cos(),
-            self.rot_y.sin(),
-            self.rot_xz.sin() * self.rot_y.cos(),
+			self.rot_xz.cos() * self.rot_y.cos(),
+			self.rot_y.sin(),
+			self.rot_xz.sin() * self.rot_y.cos(),
 		);
-        let view = glam::Mat4::look_at_rh(self.pos, target, glam::Vec3::Y);
-        let inv_proj = proj.inverse();
+		let view = glam::Mat4::look_at_rh(self.pos, target, glam::Vec3::Y);
+		let inv_proj = proj.inverse();
 		let proj_view = proj * view;
 		let mut output = [0f32; 16 + 16 + 16];
 		output[..16].copy_from_slice(&proj_view.to_cols_array());
@@ -126,15 +126,23 @@ pub struct ShadowCasterData {
 
 impl ShadowCasterData {
 	pub fn build_gpu_data(&self, center_pos: glam::Vec3) -> [f32; 16] {
-		glam::Mat4::from_scale_rotation_translation(self.size, self.rot, center_pos).to_cols_array()
+		//let center_pos = glam::Vec3::new(150.0, 50.0, 150.0);
+		let trans_mat = glam::Mat4::from_translation(-center_pos);
+		let rot_mat = glam::Mat4::from_quat(self.rot);
+		let scale_mat = glam::Mat4::from_scale(1.0 / self.size);
+		let output = scale_mat * rot_mat * trans_mat;
+		//let output = glam::Mat4::from_scale_rotation_translation(self.size, self.rot, center_pos);
+		//println!("{:?}", output.transform_point3(glam::Vec3::new(10.0, 10.0, 10.0)));
+		output.to_cols_array()
 	}
 }
 
 impl Default for ShadowCasterData {
 	fn default() -> Self {
+		const PI: f32 = std::f32::consts::PI;
 		Self {
-			size: glam::Vec3::new(100.0, 100.0, 100.0),
-			rot: glam::Quat::from_euler(glam::EulerRot::ZXY, std::f32::consts::PI * 0.25, std::f32::consts::PI * 0.25, 0.0),
+			size: glam::Vec3::new(200.0, 200.0, 200.0),
+			rot: glam::Quat::from_euler(glam::EulerRot::ZXY, PI * 0.25, PI * 0.25, 0.0),
 		}
 	}
 }

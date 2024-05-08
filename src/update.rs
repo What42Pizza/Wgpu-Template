@@ -25,14 +25,17 @@ pub fn update(program_data: &mut ProgramData, dt: f32) -> Result<ShouldExit> {
 fn update_camera(program_data: &mut ProgramData, dt: f32) {
 	let input = &program_data.input;
 	let camera_data = &mut program_data.camera_data;
-	let speed = 30.0 * dt;
+	let mut speed = 30.0 * dt;
+	if program_data.input.key_is_down(KeyCode::ShiftLeft) {
+		speed *= 5.0;
+	}
 	let forward = glam::Vec3::new(
 		camera_data.rot_xz.cos() * camera_data.rot_y.cos(),
 		camera_data.rot_y.sin(),
 		camera_data.rot_xz.sin() * camera_data.rot_y.cos(),
 	);
 	let forward_dir = forward.normalize();
-	let right_dir = forward_dir.cross(glam::Vec3::Y);
+	let right_dir = forward_dir.cross(glam::Vec3::Y).normalize();
 	
 	if input.key_is_down(KeyCode::KeyW) {
 		camera_data.pos += forward_dir * speed;

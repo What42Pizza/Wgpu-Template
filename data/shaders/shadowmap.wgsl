@@ -1,41 +1,39 @@
-@group(0) @binding(0) var<uniform> proj_mat: mat4x4<f32>;
+@group(0) @binding(0) var<uniform> proj_mat: mat4x4f;
+
+struct BasicVertexInput {
+	@location(0) position: vec3f,
+}
+
+struct ExtendedVertexInput {
+	@location(1) texcoords: vec2f,
+	@location(2) normal: vec2f,
+}
 
 struct InstanceInput {
-	@location(3) model_mat_0: vec4<f32>,
-	@location(4) model_mat_1: vec4<f32>,
-	@location(5) model_mat_2: vec4<f32>,
-	@location(6) model_mat_3: vec4<f32>,
+	@location(3) model_mat_0: vec4f,
+	@location(4) model_mat_1: vec4f,
+	@location(5) model_mat_2: vec4f,
+	@location(6) model_mat_3: vec4f,
 };
 
 
 
 @vertex
 fn vs_main(
-	@location(0) position: vec3<f32>,
+	vertex_basic: BasicVertexInput,
+	vertex_extended: ExtendedVertexInput,
 	instance: InstanceInput,
-) -> @builtin(position) vec4<f32> {
+) -> @builtin(position) vec4f {
 	
-	let model_mat = mat4x4<f32>(
+	let instance_mat = mat4x4(
 		instance.model_mat_0,
 		instance.model_mat_1,
 		instance.model_mat_2,
 		instance.model_mat_3,
 	);
 	
-	var out = proj_mat * model_mat * vec4<f32>(position, 1.0);
-	out.z = out.z * 0.5 + 0.25;
+	var out = proj_mat * instance_mat * vec4(vertex_basic.position, 1.0);
+	out = vec4(out.xyz / out.w, 1.0); // idk if this is needed
+	out.z = out.z * 0.5 + 0.5;
 	return out;
 }
-
-
-
-//struct VertexOutput {
-//	@builtin(position) pos: vec4<f32>,
-//};
-
-
-
-//@fragment
-//fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-//	return textureSample(material_texture, material_sampler, in.texcoords);
-//}

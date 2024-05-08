@@ -1,9 +1,9 @@
 @group(0) @binding(0) var<uniform> camera_data: CameraData;
 
 struct CameraData {
-	proj_view_mat: mat4x4<f32>,
-	inv_proj_mat: mat4x4<f32>,
-	view_mat: mat4x4<f32>,
+	proj_view_mat: mat4x4f,
+	inv_proj_mat: mat4x4f,
+	view_mat: mat4x4f,
 }
 
 
@@ -14,20 +14,20 @@ fn vs_main(
 ) -> VertexOutput {
 	
 	// hacky way to draw a single large triangle that convers the entire screen
-	let screen_pos = vec4<f32>(
+	let screen_pos = vec4(
 		f32(i32(index) / 2) * 4.0 - 1.0,
 		f32(i32(index) & 1) * 4.0 - 1.0,
 		1.0,
 		1.0
 	);
-	let inv_view_mat = transpose(mat3x3<f32>(camera_data.view_mat[0].xyz, camera_data.view_mat[1].xyz, camera_data.view_mat[2].xyz));
+	let inv_view_mat = transpose(mat3x3(camera_data.view_mat[0].xyz, camera_data.view_mat[1].xyz, camera_data.view_mat[2].xyz));
 	
 	let camera_pos = camera_data.inv_proj_mat * screen_pos;
 	let world_pos = inv_view_mat * camera_pos.xyz;
 	
 	var out: VertexOutput;
 	out.screen_pos = screen_pos;
-	out.screen_pos.z = out.screen_pos.z * 0.5 + 0.25;
+	out.screen_pos.z = out.screen_pos.z * 0.5 + 0.5;
 	out.texcoords = world_pos;
 	return out;
 }
@@ -35,8 +35,8 @@ fn vs_main(
 
 
 struct VertexOutput {
-	@builtin(position) screen_pos: vec4<f32>,
-	@location(0) texcoords: vec3<f32>,
+	@builtin(position) screen_pos: vec4f,
+	@location(0) texcoords: vec3f,
 };
 
 @group(1) @binding(0) var skybox_texture: texture_cube<f32>;
@@ -45,6 +45,6 @@ struct VertexOutput {
 
 
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	return textureSample(skybox_texture, skybox_sampler, in.texcoords);
 }

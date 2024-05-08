@@ -1,6 +1,5 @@
 shadows
 basic culling
-water
 post-processing
 	color correction
 	bloom

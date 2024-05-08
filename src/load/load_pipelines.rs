@@ -62,6 +62,7 @@ pub fn load_shadowmap_render_pipeline(
 			entry_point: "vs_main",
 			buffers: &[
 				BasicVertexData::get_layout(),
+				ExtendedVertexData::get_layout(),
 				RawInstanceData::get_layout()
 			],
 			compilation_options: wgpu::PipelineCompilationOptions::default(),
@@ -79,7 +80,7 @@ pub fn load_shadowmap_render_pipeline(
 		depth_stencil: Some(wgpu::DepthStencilState {
 			format: wgpu::TextureFormat::Depth32Float,
 			depth_write_enabled: true,
-			depth_compare: wgpu::CompareFunction::Less,
+			depth_compare: wgpu::CompareFunction::LessEqual,
 			stencil: wgpu::StencilState::default(),
 			bias: wgpu::DepthBiasState {
 				constant: 2, // corresponds to bilinear filtering
