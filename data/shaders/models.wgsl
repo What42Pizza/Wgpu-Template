@@ -1,5 +1,9 @@
 @group(0) @binding(0) var<uniform> camera_data: CameraData;
-@group(1) @binding(0) var<uniform> shadowmap_proj_mat: mat4x4f;
+@group(0) @binding(1) var<uniform> shadowmap_proj_mat: mat4x4f;
+@group(0) @binding(2) var material_sampler: sampler;
+@group(0) @binding(3) var shadowmap_texture: texture_depth_2d;
+@group(0) @binding(4) var shadowmap_sampler: sampler_comparison;
+@group(0) @binding(5) var deubg_shadowmap_sampler: sampler;
 
 struct CameraData {
 	proj_view_mat: mat4x4f,
@@ -58,12 +62,7 @@ struct VertexOutput {
 	@location(1) texcoords: vec2f,
 };
 
-@group(2) @binding(0) var material_texture: texture_2d<f32>;
-@group(2) @binding(1) var material_sampler: sampler;
-
-@group(3) @binding(0) var shadowmap_texture: texture_depth_2d;
-@group(3) @binding(1) var shadowmap_sampler: sampler_comparison;
-@group(3) @binding(2) var deubg_shadowmap_sampler: sampler;
+@group(1) @binding(0) var material_texture: texture_2d<f32>;
 
 
 

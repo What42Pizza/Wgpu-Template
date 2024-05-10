@@ -8,20 +8,21 @@ pub fn load_render_assets(
 	camera_data: &CameraData,
 	shadow_caster_data: &ShadowCasterData,
 	render_context: &RenderContextData,
-	generic_bind_layouts: &GenericBindLayouts,
-	shadowmap_size: u32
+	//generic_bind_layouts: &GenericBindLayouts,
+	shadowmap_size: u32,
+	binding_1_layout: &wgpu::BindGroupLayout,
 ) -> Result<RenderAssets> {
 	
 	let mut materials_storage = MaterialsStorage::new();
-	let example_model = load_example_model_render_data(render_context, generic_bind_layouts, &mut materials_storage).context("Failed to load model render data.")?;
-	let skybox_material_index = load_skybox_material(render_context, generic_bind_layouts, &mut materials_storage).context("Failed to load skybox render data.")?;
+	let example_models = load_example_models_render_data(render_context, &mut materials_storage, binding_1_layout).context("Failed to load model render data.")?;
+	let skybox_material_index = load_skybox_material(render_context, &mut materials_storage).context("Failed to load skybox render data.")?;
 	let depth = load_depth_render_data(render_context);
 	let shadow_caster = load_shadow_caster_data(render_context, shadowmap_size, shadow_caster_data, camera_data).context("Failed to load shadow caster render data.")?;
 	let camera = load_camera_render_data(render_context, camera_data).context("Failed to load camera render data.")?;
 	
 	Ok(RenderAssets {
 		materials_storage,
-		example_models: example_model,
+		example_models,
 		skybox_material_id: skybox_material_index,
 		depth,
 		shadow_caster,
@@ -33,13 +34,14 @@ pub fn load_render_assets(
 
 
 
-pub fn load_example_model_render_data(
+pub fn load_example_models_render_data(
 	render_context: &RenderContextData,
-	generic_bind_layouts: &GenericBindLayouts,
+	//generic_bind_layouts: &GenericBindLayouts,
 	materials_storage: &mut MaterialsStorage,
+	binding_1_layout: &wgpu::BindGroupLayout,
 ) -> Result<ModelsRenderData> {
 	
-	let example_model_meshes = load_model(utils::get_program_file_path("assets/cube.obj"), render_context, generic_bind_layouts, materials_storage)?;
+	let example_model_meshes = load_model(utils::get_program_file_path("assets/cube.obj"), render_context, materials_storage, binding_1_layout)?;
 	
 	let example_model_instances = (0..100).flat_map(|z| {
 		(0..100).map(move |x| {
@@ -79,8 +81,9 @@ pub fn load_example_model_render_data(
 pub fn load_model(
 	file_path: impl AsRef<Path>,
 	render_context: &RenderContextData,
-	generic_bind_layouts: &GenericBindLayouts,
+	//generic_bind_layouts: &GenericBindLayouts,
 	materials_storage: &mut MaterialsStorage,
+	binding_1_layout: &wgpu::BindGroupLayout,
 ) -> Result<Vec<MeshRenderData>> {
 	let file_path = file_path.as_ref();
 	let obj_text = fs::read_to_string(file_path).add_path_to_error(&file_path)?;
@@ -114,31 +117,32 @@ pub fn load_model(
 		let path = parent_folder.join(&diffuse_texture_name);
 		let material_id = match materials_storage_utils::get_material_id(&path, &materials_storage.list_2d) {
 			Some(v) => v,
-			None => materials_storage_utils::insert_material_2d(path, materials_storage, render_context, generic_bind_layouts)?,
+			None => materials_storage_utils::insert_material_2d(path, materials_storage, render_context)?,
 		};
 		material_ids.push(material_id);
 	}
 	
 	let meshes = models
 		.into_iter()
-		.map(|model| {
+		.enumerate()
+		.map(|(i, model)| {
 			let pos_count = model.mesh.positions.len() / 3;
 			let mut basic_vertices = Vec::with_capacity(pos_count);
 			let mut extended_vertices = Vec::with_capacity(pos_count);
-			for i in 0..pos_count {
+			for j in 0..pos_count {
 				basic_vertices.push(BasicVertexData {
 					position: [
-						model.mesh.positions[i * 3],
-						model.mesh.positions[i * 3 + 1],
-						model.mesh.positions[i * 3 + 2],
+						model.mesh.positions[j * 3],
+						model.mesh.positions[j * 3 + 1],
+						model.mesh.positions[j * 3 + 2],
 					],
 				});
 				extended_vertices.push(ExtendedVertexData {
-					tex_coords: [model.mesh.texcoords[i * 2], 1.0 - model.mesh.texcoords[i * 2 + 1]],
+					tex_coords: [model.mesh.texcoords[j * 2], 1.0 - model.mesh.texcoords[j * 2 + 1]],
 					normal: [
-						model.mesh.normals[i * 3],
-						model.mesh.normals[i * 3 + 1],
-						model.mesh.normals[i * 3 + 2],
+						model.mesh.normals[j * 3],
+						model.mesh.normals[j * 3 + 1],
+						model.mesh.normals[j * 3 + 2],
 					],
 				});
 			}
@@ -159,12 +163,26 @@ pub fn load_model(
 				usage: wgpu::BufferUsages::INDEX,
 			});
 			
+			let material_id = material_ids[model.mesh.material_id.unwrap_or(0)];
+			let material_view = &materials_storage.list_2d[material_id].view;
+			let binding_1 = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
+				label: Some(&format!("{:?} Binding", &file_path)),
+				layout: binding_1_layout,
+				entries: &[
+					wgpu::BindGroupEntry {
+						binding: 0,
+						resource: wgpu::BindingResource::TextureView (material_view),
+					},
+				],
+			});
+			
 			MeshRenderData {
 				basic_vertex_buffer,
 				extended_vertex_buffer,
 				index_buffer,
 				index_count: model.mesh.indices.len() as u32,
-				material_id: material_ids[model.mesh.material_id.unwrap_or(0)],
+				binding_1,
+				//material_id: material_ids[model.mesh.material_id.unwrap_or(0)],
 			}
 		})
 		.collect::<Vec<_>>();
@@ -174,8 +192,8 @@ pub fn load_model(
 
 
 
-pub fn load_skybox_material(render_context: &RenderContextData, generic_bind_layouts: &GenericBindLayouts, materials_storage: &mut MaterialsStorage) -> Result<usize> {
-	materials_storage_utils::insert_material_cube(utils::get_program_file_path("assets/skybox.png"), materials_storage, render_context, generic_bind_layouts)
+pub fn load_skybox_material(render_context: &RenderContextData, materials_storage: &mut MaterialsStorage) -> Result<usize> {
+	materials_storage_utils::insert_material_cube(utils::get_program_file_path("assets/skybox.png"), materials_storage, render_context)
 }
 
 
@@ -260,68 +278,52 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 		..Default::default()
 	});
 	
-	let depth_tex_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-		entries: &[
-			wgpu::BindGroupLayoutEntry { // texture view
-				binding: 0,
-				visibility: wgpu::ShaderStages::FRAGMENT,
-				ty: wgpu::BindingType::Texture {
-					multisampled: false,
-					view_dimension: wgpu::TextureViewDimension::D2,
-					sample_type: wgpu::TextureSampleType::Depth,
-				},
-				count: None,
-			},
-			wgpu::BindGroupLayoutEntry { // sampler
-				binding: 1,
-				visibility: wgpu::ShaderStages::FRAGMENT,
-				ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Comparison),
-				count: None,
-			},
-			wgpu::BindGroupLayoutEntry { // debug sampler
-				binding: 2,
-				visibility: wgpu::ShaderStages::FRAGMENT,
-				ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Filtering),
-				count: None,
-			},
-		],
-		label: Some("shadow_caster_depth_tex_bind_layout"),
-	});
+	//let depth_tex_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+	//	entries: &[
+	//		wgpu::BindGroupLayoutEntry { // texture view
+	//			binding: 0,
+	//			visibility: wgpu::ShaderStages::FRAGMENT,
+	//			ty: wgpu::BindingType::Texture {
+	//				multisampled: false,
+	//				view_dimension: wgpu::TextureViewDimension::D2,
+	//				sample_type: wgpu::TextureSampleType::Depth,
+	//			},
+	//			count: None,
+	//		},
+	//		wgpu::BindGroupLayoutEntry { // sampler
+	//			binding: 1,
+	//			visibility: wgpu::ShaderStages::FRAGMENT,
+	//			ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Comparison),
+	//			count: None,
+	//		},
+	//		wgpu::BindGroupLayoutEntry { // debug sampler
+	//			binding: 2,
+	//			visibility: wgpu::ShaderStages::FRAGMENT,
+	//			ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Filtering),
+	//			count: None,
+	//		},
+	//	],
+	//	label: Some("shadow_caster_depth_tex_bind_layout"),
+	//});
 	
-	let depth_tex_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
-		layout: &depth_tex_layout,
-		entries: &[
-			wgpu::BindGroupEntry { // texture view
-				binding: 0,
-				resource: wgpu::BindingResource::TextureView(&depth_tex_view),
-			},
-			wgpu::BindGroupEntry { // sampler
-				binding: 1,
-				resource: wgpu::BindingResource::Sampler(&depth_tex_sampler),
-			},
-			wgpu::BindGroupEntry { // debug sampler
-				binding: 2,
-				resource: wgpu::BindingResource::Sampler(&debug_depth_tex_sampler),
-			},
-		],
-		label: None,
-	});
-	
-	let proj_mat_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-		entries: &[
-			wgpu::BindGroupLayoutEntry { // proj_mat
-				binding: 0,
-				visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-				ty: wgpu::BindingType::Buffer {
-					ty: wgpu::BufferBindingType::Uniform,
-					has_dynamic_offset: false,
-					min_binding_size: None,
-				},
-				count: None,
-			},
-		],
-		label: Some("shadow_caster_bind_group_layout"),
-	});
+	//let depth_tex_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
+	//	layout: &depth_tex_layout,
+	//	entries: &[
+	//		wgpu::BindGroupEntry { // texture view
+	//			binding: 0,
+	//			resource: wgpu::BindingResource::TextureView(&depth_tex_view),
+	//		},
+	//		wgpu::BindGroupEntry { // sampler
+	//			binding: 1,
+	//			resource: wgpu::BindingResource::Sampler(&depth_tex_sampler),
+	//		},
+	//		wgpu::BindGroupEntry { // debug sampler
+	//			binding: 2,
+	//			resource: wgpu::BindingResource::Sampler(&debug_depth_tex_sampler),
+	//		},
+	//	],
+	//	label: None,
+	//});
 	
 	let proj_mat_buffer = render_context.device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
@@ -331,24 +333,9 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 		}
 	);
 	
-	let proj_mat_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
-		layout: &proj_mat_layout,
-		entries: &[
-			wgpu::BindGroupEntry { // proj_mat
-				binding: 0,
-				resource: proj_mat_buffer.as_entire_binding(),
-			}
-		],
-		label: Some("shadow_caster_bind_group"),
-	});
-	
 	Ok(ShadowCasterRenderData {
 		depth_tex_view,
-		depth_tex_layout,
-		depth_tex_group,
 		proj_mat_buffer,
-		proj_mat_layout,
-		proj_mat_group,
 	})
 }
 
@@ -358,22 +345,6 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 
 pub fn load_camera_render_data(render_context: &RenderContextData, camera_data: &CameraData) -> Result<CameraRenderData> {
 	
-	let bind_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-		entries: &[
-			wgpu::BindGroupLayoutEntry { // proj_view_mat, inv_proj_mat, view_mat
-				binding: 0,
-				visibility: wgpu::ShaderStages::VERTEX,
-				ty: wgpu::BindingType::Buffer {
-					ty: wgpu::BufferBindingType::Uniform,
-					has_dynamic_offset: false,
-					min_binding_size: None,
-				},
-				count: None,
-			},
-		],
-		label: Some("camera_bind_group_layout"),
-	});
-	
 	let buffer = render_context.device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
 			label: Some("Camera Buffer"),
@@ -382,20 +353,7 @@ pub fn load_camera_render_data(render_context: &RenderContextData, camera_data: 
 		}
 	);
 	
-	let bind_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
-		layout: &bind_layout,
-		entries: &[
-			wgpu::BindGroupEntry { // proj_view_mat, inv_proj_mat, view_mat
-				binding: 0,
-				resource: buffer.as_entire_binding(),
-			}
-		],
-		label: Some("camera_bind_group"),
-	});
-	
 	Ok(CameraRenderData {
 		buffer,
-		bind_layout,
-		bind_group,
 	})
 }

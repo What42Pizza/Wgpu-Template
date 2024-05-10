@@ -39,8 +39,8 @@ struct VertexOutput {
 	@location(0) texcoords: vec3f,
 };
 
-@group(1) @binding(0) var skybox_texture: texture_cube<f32>;
-@group(1) @binding(1) var skybox_sampler: sampler;
+@group(0) @binding(1) var skybox_texture: texture_cube<f32>;
+@group(0) @binding(2) var skybox_sampler: sampler;
 
 
 

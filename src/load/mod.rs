@@ -5,8 +5,8 @@ use serde_hjson::{Map, Value};
 
 
 
-pub mod load_generic_bind_layouts;
-pub use load_generic_bind_layouts::*;
+//pub mod load_generic_bind_layouts;
+//pub use load_generic_bind_layouts::*;
 pub mod load_assets;
 pub use load_assets::*;
 pub mod load_pipelines;
@@ -34,9 +34,22 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 	
 	// render data
 	let render_context = load_render_context_data(window, &engine_config)?;
-	let generic_bind_layouts = load_generic_bind_layouts(&render_context);
-	let render_assets = load_render_assets(&camera_data, &shadow_caster_data, &render_context, &generic_bind_layouts, engine_config.shadowmap_size)?;
-	let render_pipelines = load_render_pipelines(&render_context, &generic_bind_layouts, &render_assets)?;
+	let binding_1_layout = get_bind_group_layout_data(Some("models_bind_group_1"), &render_context.device, vec!(
+		// material: view
+		wgpu::BindGroupLayoutEntry {
+			binding: 0,
+			visibility: wgpu::ShaderStages::FRAGMENT,
+			ty: wgpu::BindingType::Texture {
+				multisampled: false,
+				view_dimension: wgpu::TextureViewDimension::D2,
+				sample_type: wgpu::TextureSampleType::Float { filterable: true },
+			},
+			count: None,
+		},
+	));
+	//let generic_bind_layouts = load_generic_bind_layouts(&render_context);
+	let render_assets = load_render_assets(&camera_data, &shadow_caster_data, &render_context, engine_config.shadowmap_size, &binding_1_layout)?;
+	let render_pipelines = load_render_pipelines(&render_context, &render_assets, binding_1_layout)?;
 	
 	Ok(ProgramData {
 		
@@ -52,7 +65,7 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 		
 		// render data
 		render_context,
-		generic_bind_layouts,
+		//generic_bind_layouts,
 		render_assets,
 		render_pipelines,
 		frame_start_instant: start_time,

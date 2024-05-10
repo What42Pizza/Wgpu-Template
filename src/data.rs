@@ -17,7 +17,7 @@ pub struct ProgramData<'a> {
 	
 	// render data
 	pub render_context: RenderContextData<'a>,
-	pub generic_bind_layouts: GenericBindLayouts,
+	//pub generic_bind_layouts: GenericBindLayouts,
 	pub render_assets: RenderAssets,
 	pub render_pipelines: RenderPipelines,
 	pub frame_start_instant: Instant,
@@ -199,10 +199,10 @@ pub struct RenderContextData<'a> {
 
 
 
-pub struct GenericBindLayouts {
-	pub texture_2d: wgpu::BindGroupLayout,
-	pub texture_cube: wgpu::BindGroupLayout,
-}
+//pub struct GenericBindLayouts {
+//	pub texture_2d: wgpu::BindGroupLayout,
+//	pub texture_cube: wgpu::BindGroupLayout,
+//}
 
 
 
@@ -233,7 +233,8 @@ pub type MaterialId = usize;
 
 pub struct MaterialRenderData {
 	pub path: PathBuf, // used to make sure the same data isn't loaded multiple times
-	pub bind_group: wgpu::BindGroup,
+	//pub bind_group: wgpu::BindGroup,
+	pub view: wgpu::TextureView,
 }
 
 pub struct ModelsRenderData {
@@ -247,7 +248,7 @@ pub struct MeshRenderData {
 	pub extended_vertex_buffer: wgpu::Buffer,
 	pub index_buffer: wgpu::Buffer,
 	pub index_count: u32,
-	pub material_id: MaterialId,
+	pub binding_1: wgpu::BindGroup,
 }
 
 // Many structs like this only have whatever data is actually used, if you run into a
@@ -259,11 +260,11 @@ pub struct DepthRenderData {
 
 pub struct ShadowCasterRenderData {
 	pub depth_tex_view: wgpu::TextureView,
-	pub depth_tex_layout: wgpu::BindGroupLayout,
-	pub depth_tex_group: wgpu::BindGroup,
+	//pub depth_tex_layout: wgpu::BindGroupLayout,
+	//pub depth_tex_group: wgpu::BindGroup,
 	pub proj_mat_buffer: wgpu::Buffer,
-	pub proj_mat_layout: wgpu::BindGroupLayout,
-	pub proj_mat_group: wgpu::BindGroup,
+	//pub proj_mat_layout: wgpu::BindGroupLayout,
+	//pub proj_mat_group: wgpu::BindGroup,
 }
 
 // It may be a bit disorienting to have two Camera structs, but just keep this is mind:
@@ -272,16 +273,27 @@ pub struct ShadowCasterRenderData {
 // to `CameraRenderData` each frame (or whenever needed)
 pub struct CameraRenderData {
 	pub buffer: wgpu::Buffer,
-	pub bind_layout: wgpu::BindGroupLayout,
-	pub bind_group: wgpu::BindGroup,
+	//pub bind_layout: wgpu::BindGroupLayout,
+	//pub bind_group: wgpu::BindGroup,
 }
 
 
 
 pub struct RenderPipelines {
-	pub shadowmap: wgpu::RenderPipeline,
-	pub example_model: wgpu::RenderPipeline,
-	pub skybox: wgpu::RenderPipeline,
+	
+	pub shadowmap_pipeline: wgpu::RenderPipeline,
+	pub shadowmap_bind_0_layout: wgpu::BindGroupLayout,
+	pub shadowmap_bind_0: wgpu::BindGroup,
+	
+	pub models_pipeline: wgpu::RenderPipeline,
+	pub models_bind_0_layout: wgpu::BindGroupLayout,
+	pub models_bind_0: wgpu::BindGroup,
+	pub models_bind_1_layout: wgpu::BindGroupLayout,
+	
+	pub skybox_pipeline: wgpu::RenderPipeline,
+	pub skybox_bind_0_layout: wgpu::BindGroupLayout,
+	pub skybox_bind_0: wgpu::BindGroup,
+	
 }
 
 
