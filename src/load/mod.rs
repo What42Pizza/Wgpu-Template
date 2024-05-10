@@ -5,8 +5,6 @@ use serde_hjson::{Map, Value};
 
 
 
-//pub mod load_generic_bind_layouts;
-//pub use load_generic_bind_layouts::*;
 pub mod load_assets;
 pub use load_assets::*;
 pub mod load_pipelines;
@@ -47,7 +45,6 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 			count: None,
 		},
 	));
-	//let generic_bind_layouts = load_generic_bind_layouts(&render_context);
 	let render_assets = load_render_assets(&camera_data, &shadow_caster_data, &render_context, engine_config.shadowmap_size, &binding_1_layout)?;
 	let render_pipelines = load_render_pipelines(&render_context, &render_assets, binding_1_layout)?;
 	

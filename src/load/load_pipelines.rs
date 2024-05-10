@@ -19,7 +19,6 @@ pub fn load_render_pipelines(render_context: &RenderContextData, render_assets: 
 		models_pipeline,
 		models_bind_0_layout,
 		models_bind_0,
-		//models_bind_1_layout
 	) =
 		load_models_render_pipeline(
 			render_context,
@@ -165,7 +164,6 @@ pub fn load_models_render_pipeline(
 	wgpu::RenderPipeline,
 	wgpu::BindGroupLayout,
 	wgpu::BindGroup,
-	//wgpu::BindGroupLayout,
 )> {
 	
 	let shader_path = utils::get_program_file_path("shaders/models.wgsl");
@@ -338,7 +336,6 @@ pub fn load_models_render_pipeline(
 		pipeline,
 		bind_group_0_layout,
 		bind_group_0,
-		//bind_group_1_layout,
 	))
 }
 

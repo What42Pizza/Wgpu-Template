@@ -15,7 +15,6 @@ pub fn insert_material_2d(
 	path: impl Into<PathBuf>,
 	materials_storage: &mut MaterialsStorage,
 	render_context: &RenderContextData,
-	//generic_bind_layouts: &GenericBindLayouts,
 ) -> Result<MaterialId> {
 	let output = materials_storage.list_2d.len();
 	let material = load_material_2d(path, render_context).context("Failed to load material_2d.")?;
@@ -27,7 +26,6 @@ pub fn insert_material_cube(
 	path: impl Into<PathBuf>,
 	materials_storage: &mut MaterialsStorage,
 	render_context: &RenderContextData,
-	//generic_bind_layouts: &GenericBindLayouts,
 ) -> Result<MaterialId> {
 	let output = materials_storage.list_cube.len();
 	let material = load_material_cube(path, render_context).context("Failed to load material_cube")?;
@@ -43,7 +41,6 @@ pub fn insert_material_cube(
 pub fn load_material_2d(
 	path: impl Into<PathBuf>,
 	render_context: &RenderContextData,
-	//texture_2d_bind_layout: &wgpu::BindGroupLayout,
 ) -> Result<MaterialRenderData> {
 	let path = path.into();
 	
@@ -87,34 +84,9 @@ pub fn load_material_2d(
 	);
 	
 	let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-	//let sampler = render_context.device.create_sampler(&wgpu::SamplerDescriptor {
-	//	address_mode_u: wgpu::AddressMode::ClampToEdge,
-	//	address_mode_v: wgpu::AddressMode::ClampToEdge,
-	//	address_mode_w: wgpu::AddressMode::ClampToEdge,
-	//	mag_filter: wgpu::FilterMode::Linear,
-	//	min_filter: wgpu::FilterMode::Nearest,
-	//	mipmap_filter: wgpu::FilterMode::Nearest,
-	//	..Default::default()
-	//});
-	
-	//let bind_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
-	//	layout: texture_2d_bind_layout,
-	//	entries: &[
-	//		wgpu::BindGroupEntry { // texture view
-	//			binding: 0,
-	//			resource: wgpu::BindingResource::TextureView(&view),
-	//		},
-	//		wgpu::BindGroupEntry { // texture sampler
-	//			binding: 1,
-	//			resource: wgpu::BindingResource::Sampler(&sampler),
-	//		},
-	//	],
-	//	label: None,
-	//});
 	
 	Ok(MaterialRenderData {
 		path,
-		//bind_group,
 		view,
 	})
 }
@@ -125,7 +97,6 @@ pub fn load_material_2d(
 pub fn load_material_cube(
 	path: impl Into<PathBuf>,
 	render_context: &RenderContextData,
-	//texture_cube_bind_layout: &wgpu::BindGroupLayout,
 ) -> Result<MaterialRenderData> {
 	let path = path.into();
 	
@@ -173,34 +144,9 @@ pub fn load_material_cube(
 		dimension: Some(wgpu::TextureViewDimension::Cube),
 		..Default::default()
 	});
-	//let sampler = render_context.device.create_sampler(&wgpu::SamplerDescriptor {
-	//	address_mode_u: wgpu::AddressMode::ClampToEdge,
-	//	address_mode_v: wgpu::AddressMode::ClampToEdge,
-	//	address_mode_w: wgpu::AddressMode::ClampToEdge,
-	//	mag_filter: wgpu::FilterMode::Linear,
-	//	min_filter: wgpu::FilterMode::Nearest,
-	//	mipmap_filter: wgpu::FilterMode::Nearest,
-	//	..Default::default()
-	//});
-	
-	//let bind_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
-	//	layout: texture_cube_bind_layout,
-	//	entries: &[
-	//		wgpu::BindGroupEntry { // texture view
-	//			binding: 0,
-	//			resource: wgpu::BindingResource::TextureView(&view),
-	//		},
-	//		wgpu::BindGroupEntry { // texture sampler
-	//			binding: 1,
-	//			resource: wgpu::BindingResource::Sampler(&sampler),
-	//		},
-	//	],
-	//	label: None,
-	//});
 	
 	Ok(MaterialRenderData {
 		path,
-		//bind_group,
 		view,
 	})
 }

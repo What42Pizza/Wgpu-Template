@@ -8,7 +8,6 @@ pub fn load_render_assets(
 	camera_data: &CameraData,
 	shadow_caster_data: &ShadowCasterData,
 	render_context: &RenderContextData,
-	//generic_bind_layouts: &GenericBindLayouts,
 	shadowmap_size: u32,
 	binding_1_layout: &wgpu::BindGroupLayout,
 ) -> Result<RenderAssets> {
@@ -36,7 +35,6 @@ pub fn load_render_assets(
 
 pub fn load_example_models_render_data(
 	render_context: &RenderContextData,
-	//generic_bind_layouts: &GenericBindLayouts,
 	materials_storage: &mut MaterialsStorage,
 	binding_1_layout: &wgpu::BindGroupLayout,
 ) -> Result<ModelsRenderData> {
@@ -81,7 +79,6 @@ pub fn load_example_models_render_data(
 pub fn load_model(
 	file_path: impl AsRef<Path>,
 	render_context: &RenderContextData,
-	//generic_bind_layouts: &GenericBindLayouts,
 	materials_storage: &mut MaterialsStorage,
 	binding_1_layout: &wgpu::BindGroupLayout,
 ) -> Result<Vec<MeshRenderData>> {
@@ -182,7 +179,6 @@ pub fn load_model(
 				index_buffer,
 				index_count: model.mesh.indices.len() as u32,
 				binding_1,
-				//material_id: material_ids[model.mesh.material_id.unwrap_or(0)],
 			}
 		})
 		.collect::<Vec<_>>();
@@ -277,53 +273,6 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 		mipmap_filter: wgpu::FilterMode::Nearest,
 		..Default::default()
 	});
-	
-	//let depth_tex_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-	//	entries: &[
-	//		wgpu::BindGroupLayoutEntry { // texture view
-	//			binding: 0,
-	//			visibility: wgpu::ShaderStages::FRAGMENT,
-	//			ty: wgpu::BindingType::Texture {
-	//				multisampled: false,
-	//				view_dimension: wgpu::TextureViewDimension::D2,
-	//				sample_type: wgpu::TextureSampleType::Depth,
-	//			},
-	//			count: None,
-	//		},
-	//		wgpu::BindGroupLayoutEntry { // sampler
-	//			binding: 1,
-	//			visibility: wgpu::ShaderStages::FRAGMENT,
-	//			ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Comparison),
-	//			count: None,
-	//		},
-	//		wgpu::BindGroupLayoutEntry { // debug sampler
-	//			binding: 2,
-	//			visibility: wgpu::ShaderStages::FRAGMENT,
-	//			ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Filtering),
-	//			count: None,
-	//		},
-	//	],
-	//	label: Some("shadow_caster_depth_tex_bind_layout"),
-	//});
-	
-	//let depth_tex_group = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
-	//	layout: &depth_tex_layout,
-	//	entries: &[
-	//		wgpu::BindGroupEntry { // texture view
-	//			binding: 0,
-	//			resource: wgpu::BindingResource::TextureView(&depth_tex_view),
-	//		},
-	//		wgpu::BindGroupEntry { // sampler
-	//			binding: 1,
-	//			resource: wgpu::BindingResource::Sampler(&depth_tex_sampler),
-	//		},
-	//		wgpu::BindGroupEntry { // debug sampler
-	//			binding: 2,
-	//			resource: wgpu::BindingResource::Sampler(&debug_depth_tex_sampler),
-	//		},
-	//	],
-	//	label: None,
-	//});
 	
 	let proj_mat_buffer = render_context.device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {

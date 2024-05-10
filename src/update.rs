@@ -11,9 +11,9 @@ pub fn update(program_data: &mut ProgramData, dt: f32) -> Result<ShouldExit> {
 		return Ok(true);
 	}
 	
-	//if program_data.input.is_focused {
+	if program_data.input.is_focused {
 		update_camera(program_data, dt);
-	//}
+	}
 	
 	update_gpu_buffers(program_data);
 	
