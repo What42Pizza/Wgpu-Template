@@ -7,9 +7,9 @@ pub fn render(output: &wgpu::SurfaceTexture, program_data: &mut ProgramData) {
 	let encoder_descriptor = wgpu::CommandEncoderDescriptor {label: Some("Render Encoder")};
 	let mut encoder = program_data.render_context.device.create_command_encoder(&encoder_descriptor);
 	
-	render_shadowmap_pipeline(program_data, &mut encoder);
+	render_shadow_caster_pipeline(program_data, &mut encoder);
 	render_models_pipeline(program_data, &mut encoder, &output_view);
-	render_skybox_pipeline(program_data, &mut encoder, &output_view); // it's better to have this at the end so that only the necessary pixels are rendered
+	render_skybox_pipeline(program_data, &mut encoder, &output_view); /// it's better to have this at the end so that only the necessary pixels are rendered
 	
 	program_data.render_context.command_queue.submit(std::iter::once(encoder.finish()));
 }
@@ -18,11 +18,11 @@ pub fn render(output: &wgpu::SurfaceTexture, program_data: &mut ProgramData) {
 
 
 
-pub fn render_shadowmap_pipeline(program_data: &ProgramData, encoder: &mut wgpu::CommandEncoder) {
+pub fn render_shadow_caster_pipeline(program_data: &ProgramData, encoder: &mut wgpu::CommandEncoder) {
 	let render_assets = &program_data.render_assets;
 	
-	let mut shadowmap_pass_handle = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-		label: Some("Shadowmap Render Pass"),
+	let mut shadow_caster_pass_handle = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+		label: Some("shadow_caster_render_pass"),
 		color_attachments: &[],
 		depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
 			view: &render_assets.depth.view,
@@ -36,16 +36,16 @@ pub fn render_shadowmap_pipeline(program_data: &ProgramData, encoder: &mut wgpu:
 		timestamp_writes: None,
 	});
 	
-	let pipelines = &program_data.render_pipelines;
-	shadowmap_pass_handle.set_pipeline(&pipelines.shadowmap_pipeline);
-	shadowmap_pass_handle.set_bind_group(0, &pipelines.shadowmap_bind_0, &[]);
+	shadow_caster_pass_handle.set_pipeline(&program_data.render_layouts.shadow_caster_pipeline);
+	shadow_caster_pass_handle.set_bind_group(0, &program_data.render_bindings.shadow_caster_bind_0, &[]);
 	
-	let mesh = &render_assets.example_models.meshes[0];
-	shadowmap_pass_handle.set_vertex_buffer(0, mesh.basic_vertex_buffer.slice(..));
-	shadowmap_pass_handle.set_vertex_buffer(1, mesh.extended_vertex_buffer.slice(..)); // TODO: remove this line
-	shadowmap_pass_handle.set_vertex_buffer(2, render_assets.example_models.instances_buffer.slice(..));
-	shadowmap_pass_handle.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-	shadowmap_pass_handle.draw_indexed(0..mesh.index_count, 0, 0..render_assets.example_models.instances_count);
+	for mesh in &render_assets.example_models.meshes {
+		shadow_caster_pass_handle.set_vertex_buffer(0, mesh.basic_vertex_buffer.slice(..));
+		shadow_caster_pass_handle.set_vertex_buffer(1, mesh.extended_vertex_buffer.slice(..)); // TODO: remove this line
+		shadow_caster_pass_handle.set_vertex_buffer(2, render_assets.example_models.instances_buffer.slice(..));
+		shadow_caster_pass_handle.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+		shadow_caster_pass_handle.draw_indexed(0..mesh.index_count, 0, 0..render_assets.example_models.instances_count);
+	}
 	
 }
 
@@ -83,17 +83,17 @@ pub fn render_models_pipeline(program_data: &ProgramData, encoder: &mut wgpu::Co
 		timestamp_writes: None,
 	});
 	
-	let pipelines = &program_data.render_pipelines;
-	models_pass_handle.set_pipeline(&pipelines.models_pipeline);
-	models_pass_handle.set_bind_group(0, &pipelines.models_bind_0, &[]);
+	models_pass_handle.set_pipeline(&program_data.render_layouts.models_pipeline);
+	models_pass_handle.set_bind_group(0, &program_data.render_bindings.models_bind_0, &[]);
 	
-	let mesh = &render_assets.example_models.meshes[0];
-	models_pass_handle.set_bind_group(1, &mesh.binding_1, &[]);
-	models_pass_handle.set_vertex_buffer(0, mesh.basic_vertex_buffer.slice(..));
-	models_pass_handle.set_vertex_buffer(1, mesh.extended_vertex_buffer.slice(..));
-	models_pass_handle.set_vertex_buffer(2, render_assets.example_models.instances_buffer.slice(..));
-	models_pass_handle.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-	models_pass_handle.draw_indexed(0..mesh.index_count, 0, 0..render_assets.example_models.instances_count);
+	for (i, mesh) in program_data.render_assets.example_models.meshes.iter().enumerate() {
+		models_pass_handle.set_bind_group(1, &program_data.render_bindings.example_models_bind_1s[i], &[]);
+		models_pass_handle.set_vertex_buffer(0, mesh.basic_vertex_buffer.slice(..));
+		models_pass_handle.set_vertex_buffer(1, mesh.extended_vertex_buffer.slice(..));
+		models_pass_handle.set_vertex_buffer(2, render_assets.example_models.instances_buffer.slice(..));
+		models_pass_handle.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+		models_pass_handle.draw_indexed(0..mesh.index_count, 0, 0..render_assets.example_models.instances_count);
+	}
 	
 }
 
@@ -126,9 +126,8 @@ pub fn render_skybox_pipeline(program_data: &ProgramData, encoder: &mut wgpu::Co
 		timestamp_writes: None,
 	});
 	
-	let pipelines = &program_data.render_pipelines;
-	skybox_pass_handle.set_pipeline(&pipelines.skybox_pipeline);
-	skybox_pass_handle.set_bind_group(0, &pipelines.skybox_bind_0, &[]);
+	skybox_pass_handle.set_pipeline(&program_data.render_layouts.skybox_pipeline);
+	skybox_pass_handle.set_bind_group(0, &program_data.render_bindings.skybox_bind_0, &[]);
 	
 	skybox_pass_handle.draw(0..3, 0..1)
 	

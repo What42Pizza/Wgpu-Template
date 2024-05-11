@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-// The purpose of this is to make sure textures are only loaded once
+/// The purpose of this is to make sure textures are only loaded once
 
 
 

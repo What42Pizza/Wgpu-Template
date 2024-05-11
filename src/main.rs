@@ -1,5 +1,5 @@
 // Started:      24/04/18
-// Last updated: 24/05/10
+// Last updated: 24/05/11
 
 // Learn Wgpu website: https://sotrh.github.io/learn-wgpu/
 // Learn Wgpu repo: https://github.com/sotrh/learn-wgpu
@@ -64,12 +64,12 @@ fn main() -> Result<()> {
 	}
 	env_logger::init();
 	
-	// With Winit 0.30.0, there's kinda a catch-22 here where A: we need the window to be
-	// available before we create the application struct, B: we need the application
-	// struct in order to start the event loop, and C: we need to start the event loop to
-	// create a window. So, we use EventLoopExtPumpEvents::pump_app_events to run the
-	// event loop until we can get a window, then use that to create the application
-	// struct, then use that to start the event loop
+	/// With Winit 0.30.0, there's kinda a catch-22 here where A: we need the window to be
+	/// available before we create the application struct, B: we need the application
+	/// struct in order to start the event loop, and C: we need to start the event loop to
+	/// create a window. So, we use EventLoopExtPumpEvents::pump_app_events to run the
+	/// event loop until we can get a window, then use that to create the application
+	/// struct, then use that to start the event loop
 	info!("Running initialization event_loop...");
 	let mut event_loop = EventLoop::new().context("Failed to create event loop.")?;
 	let mut init_data = InitData::default();
@@ -91,7 +91,7 @@ fn main() -> Result<()> {
 
 
 
-// the entire purpose of this part is to get a usable window
+/// the entire purpose of this part is to get a usable window
 
 #[derive(Default)]
 pub struct InitData {

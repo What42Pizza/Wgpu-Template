@@ -17,8 +17,12 @@ pub struct ProgramData<'a> {
 	
 	// render data
 	pub render_context: RenderContextData<'a>,
+	/// There are (currently) three render 'modules', shadow_caster, models, and skybox.
+	/// the layouts for all three are created, then the assets (buffers and tex views) for
+	/// all three are created, then the bindings to the assets for all three are created.
+	pub render_layouts: RenderLayouts,
 	pub render_assets: RenderAssets,
-	pub render_pipelines: RenderPipelines,
+	pub render_bindings: RenderBindings,
 	pub frame_start_instant: Instant,
 	
 }
@@ -77,11 +81,11 @@ pub struct CameraData {
 }
 
 impl CameraData {
-	// Ideally you should use some sort of processing cpu-side that accounts for the fact
-	// that `glam` (and similar crates) expect a z-range of -1 to 1 while wgpu expects a
-	// z-range of 0 to 1, but I haven't been able to integrate this matrix with the
-	// skybox code, and I've found that it's easier to just correct the z-range at the
-	// end of the vertex shaders (`pos.z = pos.z * 0.5 + 0.5`)
+	/// Ideally you should use some sort of processing cpu-side that accounts for the fact
+	/// that `glam` (and similar crates) expect a z-range of -1 to 1 while wgpu expects a
+	/// z-range of 0 to 1, but I haven't been able to integrate this matrix with the
+	/// skybox code, and I've found that it's easier to just correct the z-range at the
+	/// end of the vertex shaders (`pos.z = pos.z * 0.5 + 0.5`)
 	//pub const OPENGL_TO_WGPU_MATRIX: glam::Mat4 = glam::Mat4::from_cols_array(&[
 	//	1.0, 0.0, 0.0, 0.0,
 	//	0.0, 1.0, 0.0, 0.0,
@@ -198,13 +202,44 @@ pub struct RenderContextData<'a> {
 
 
 
+pub struct RenderLayouts {
+	
+	// shadow_caster render data
+	pub shadow_caster_pipeline: wgpu::RenderPipeline,
+	pub shadow_caster_bind_0_layout: wgpu::BindGroupLayout,
+	
+	// models render data
+	pub models_pipeline: wgpu::RenderPipeline,
+	pub models_bind_0_layout: wgpu::BindGroupLayout,
+	pub models_bind_1_layout: wgpu::BindGroupLayout,
+	
+	// skybox render data
+	pub skybox_pipeline: wgpu::RenderPipeline,
+	pub skybox_bind_0_layout: wgpu::BindGroupLayout,
+	
+}
+
+
+
+// this holds buffers, views, samplers, etc
 pub struct RenderAssets {
-	pub materials_storage: MaterialsStorage,
-	pub example_models: ModelsRenderData,
-	pub skybox_material_id: MaterialId,
+	
+	// general render data
 	pub depth: DepthRenderData,
-	pub shadow_caster: ShadowCasterRenderData,
 	pub camera: CameraRenderData,
+	pub default_sampler: wgpu::Sampler,
+	pub materials_storage: MaterialsStorage,
+	
+	// shadow_caster render data
+	pub shadow_caster: ShadowCasterRenderData,
+	
+	// models render data
+	pub example_models: ModelsRenderData,
+	
+	// skybox render data
+	pub skybox_material_id: MaterialId,
+	pub skybox_sampler: wgpu::Sampler,
+	
 }
 
 pub struct MaterialsStorage {
@@ -224,13 +259,15 @@ impl MaterialsStorage {
 pub type MaterialId = usize;
 
 pub struct MaterialRenderData {
-	pub path: PathBuf, // used to make sure the same data isn't loaded multiple times
+	pub path: PathBuf, /// used to make sure the same data isn't loaded multiple times
 	pub view: wgpu::TextureView,
 }
 
 pub struct ModelsRenderData {
+	/// defines the data per model
 	pub instances_buffer: wgpu::Buffer,
 	pub instances_count: u32,
+	/// defines the data for a single model
 	pub meshes: Vec<MeshRenderData>,
 }
 
@@ -239,44 +276,43 @@ pub struct MeshRenderData {
 	pub extended_vertex_buffer: wgpu::Buffer,
 	pub index_buffer: wgpu::Buffer,
 	pub index_count: u32,
-	pub binding_1: wgpu::BindGroup,
+	pub material_id: MaterialId,
 }
 
-// Many structs like this only have whatever data is actually used, if you run into a
-// situation where you also need the Texture, Sampler, etc then you can just add them to
-// the relevant struct
+/// Many structs like this only have whatever data is actually used, if you run into a
+/// situation where you also need the Texture, Sampler, etc then you can just add them to
+/// the relevant struct
 pub struct DepthRenderData {
 	pub view: wgpu::TextureView,
 }
 
 pub struct ShadowCasterRenderData {
 	pub depth_tex_view: wgpu::TextureView,
+	pub depth_sampler: wgpu::Sampler,
+	pub debug_depth_sampler: wgpu::Sampler,
 	pub proj_mat_buffer: wgpu::Buffer,
 }
 
-// It may be a bit disorienting to have two Camera structs, but just keep this is mind:
-// the struct `CameraData` holds the data used for app logic, the struct
-// `CameraRenderData` holds the data for rendering logic, and data is moved from `Camera`
-// to `CameraRenderData` each frame (or whenever needed)
+/// It may be a bit disorienting to have two Camera structs, but just keep this is mind:
+/// the struct `CameraData` holds the data used for app logic, the struct
+/// `CameraRenderData` holds the data for rendering logic, and data is moved from `Camera`
+/// to `CameraRenderData` each frame (or whenever needed)
 pub struct CameraRenderData {
 	pub buffer: wgpu::Buffer,
 }
 
 
 
-pub struct RenderPipelines {
+pub struct RenderBindings {
 	
-	pub shadowmap_pipeline: wgpu::RenderPipeline,
-	pub shadowmap_bind_0_layout: wgpu::BindGroupLayout,
-	pub shadowmap_bind_0: wgpu::BindGroup,
+	// shadow_caster render data
+	pub shadow_caster_bind_0: wgpu::BindGroup,
 	
-	pub models_pipeline: wgpu::RenderPipeline,
-	pub models_bind_0_layout: wgpu::BindGroupLayout,
+	// models render data
 	pub models_bind_0: wgpu::BindGroup,
-	pub models_bind_1_layout: wgpu::BindGroupLayout,
+	pub example_models_bind_1s: Vec<wgpu::BindGroup>, // corresponds to the vec in render_assets.example_models.meshes
 	
-	pub skybox_pipeline: wgpu::RenderPipeline,
-	pub skybox_bind_0_layout: wgpu::BindGroupLayout,
+	// skybox render data
 	pub skybox_bind_0: wgpu::BindGroup,
 	
 }
@@ -304,7 +340,7 @@ impl BasicVertexData {
 
 
 
-// NOTE: 'extended' here means more advanced, having more data
+/// NOTE: 'extended' here means more advanced, having more data
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct ExtendedVertexData {

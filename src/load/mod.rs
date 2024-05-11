@@ -5,10 +5,12 @@ use serde_hjson::{Map, Value};
 
 
 
+pub mod load_layouts;
+pub use load_layouts::*;
 pub mod load_assets;
 pub use load_assets::*;
-pub mod load_pipelines;
-pub use load_pipelines::*;
+pub mod load_bindings;
+pub use load_bindings::*;
 
 
 
@@ -20,7 +22,7 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 	let input = EngineInput {
 		pressed_keys: HashSet::new(),
 		prev_pressed_keys: HashSet::new(),
-		is_focused: false,
+		is_focused: true,
 		mouse_pos: PhysicalPosition::new(0.0, 0.0),
 		prev_mouse_pos: PhysicalPosition::new(0.0, 0.0),
 	};
@@ -32,21 +34,9 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 	
 	// render data
 	let render_context = load_render_context_data(window, &engine_config)?;
-	let binding_1_layout = get_bind_group_layout_data(Some("models_bind_group_1"), &render_context.device, vec!(
-		// material: view
-		wgpu::BindGroupLayoutEntry {
-			binding: 0,
-			visibility: wgpu::ShaderStages::FRAGMENT,
-			ty: wgpu::BindingType::Texture {
-				multisampled: false,
-				view_dimension: wgpu::TextureViewDimension::D2,
-				sample_type: wgpu::TextureSampleType::Float { filterable: true },
-			},
-			count: None,
-		},
-	));
-	let render_assets = load_render_assets(&camera_data, &shadow_caster_data, &render_context, engine_config.shadowmap_size, &binding_1_layout)?;
-	let render_pipelines = load_render_pipelines(&render_context, &render_assets, binding_1_layout)?;
+	let render_layouts = load_render_layouts(&render_context)?;
+	let render_assets = load_render_assets(&camera_data, &shadow_caster_data, &render_context, engine_config.shadowmap_size)?;
+	let render_bindings = load_render_bindings(&render_context, &render_layouts, &render_assets)?;
 	
 	Ok(ProgramData {
 		
@@ -62,9 +52,9 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 		
 		// render data
 		render_context,
-		//generic_bind_layouts,
+		render_layouts,
 		render_assets,
-		render_pipelines,
+		render_bindings,
 		frame_start_instant: start_time,
 		
 	})
