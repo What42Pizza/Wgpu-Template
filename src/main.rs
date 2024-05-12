@@ -274,6 +274,13 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 		let fps_counter_output = program_data.fps_counter.step(frame_start_time.elapsed());
 		if let Some((average_fps, average_frame_time)) = fps_counter_output {
 			println!("FPS: {average_fps}  (avg frame time: {average_frame_time:?})");
+			unsafe {
+				static mut COUNT: usize = 0;
+				COUNT += 1;
+				if COUNT > 3 {
+					panic!();
+				}
+			}
 		}
 		
 		

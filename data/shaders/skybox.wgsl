@@ -1,5 +1,8 @@
 @group(0) @binding(0) var<uniform> camera_data: CameraData;
 
+@group(0) @binding(6) var skybox_texture: texture_cube<f32>;
+@group(0) @binding(7) var skybox_sampler: sampler;
+
 struct CameraData {
 	proj_view_mat: mat4x4f,
 	inv_proj_mat: mat4x4f,
@@ -38,9 +41,6 @@ struct VertexOutput {
 	@builtin(position) screen_pos: vec4f,
 	@location(0) texcoords: vec3f,
 };
-
-@group(0) @binding(1) var skybox_texture: texture_cube<f32>;
-@group(0) @binding(2) var skybox_sampler: sampler;
 
 
 

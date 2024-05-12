@@ -19,7 +19,7 @@ pub struct ProgramData<'a> {
 	// render data
 	pub render_context: RenderContextData<'a>,
 	/// There are (currently) three render 'modules', shadow_caster, models, and skybox.
-	/// the layouts for all three are created, then the assets (buffers and tex views) for
+	/// The layouts for all three are created, then the assets (buffers and tex views) for
 	/// all three are created, then the bindings to the assets for all three are created.
 	pub render_layouts: RenderLayouts,
 	pub render_assets: RenderAssets,
@@ -87,12 +87,12 @@ impl CameraData {
 	/// z-range of 0 to 1, but I haven't been able to integrate this matrix with the
 	/// skybox code, and I've found that it's easier to just correct the z-range at the
 	/// end of the vertex shaders (`pos.z = pos.z * 0.5 + 0.5`)
-	//pub const OPENGL_TO_WGPU_MATRIX: glam::Mat4 = glam::Mat4::from_cols_array(&[
-	//	1.0, 0.0, 0.0, 0.0,
-	//	0.0, 1.0, 0.0, 0.0,
-	//	0.0, 0.0, 0.5, 0.5,
-	//	0.0, 0.0, 0.0, 1.0,
-	//]);
+	pub const OPENGL_TO_WGPU_MATRIX: glam::Mat4 = glam::Mat4::from_cols_array(&[
+		1.0, 0.0, 0.0, 0.0,
+		0.0, 1.0, 0.0, 0.0,
+		0.0, 0.0, 0.5, 0.5,
+		0.0, 0.0, 0.0, 1.0,
+	]);
 	pub fn build_gpu_data(&self, aspect_ratio: f32) -> [f32; 16 + 16 + 16] {
 		let proj = glam::Mat4::perspective_rh(self.fov, aspect_ratio, 1.0, 50.0);
 		let target = self.pos + glam::Vec3::new(
@@ -203,20 +203,25 @@ pub struct RenderContextData<'a> {
 
 
 
+/// Wgpu's wiki says that bind group 0 should hold per-frame data, bind group 1 holds
+/// per-pass data, and bind group 2 holds per-draw data. Meaning, bind group 0 should be
+/// replaced every frame, bind group 1 should be replaced every render pass (if needed),
+/// and bind group 2 should be replaced every draw call (if needed).
+
 pub struct RenderLayouts {
+	
+	// general render data
+	pub bind_0_layout: wgpu::BindGroupLayout,
 	
 	// shadow_caster render data
 	pub shadow_caster_pipeline: wgpu::RenderPipeline,
-	pub shadow_caster_bind_0_layout: wgpu::BindGroupLayout,
 	
 	// models render data
 	pub models_pipeline: wgpu::RenderPipeline,
-	pub models_bind_0_layout: wgpu::BindGroupLayout,
 	pub models_bind_1_layout: wgpu::BindGroupLayout,
 	
 	// skybox render data
 	pub skybox_pipeline: wgpu::RenderPipeline,
-	pub skybox_bind_0_layout: wgpu::BindGroupLayout,
 	
 }
 
@@ -260,7 +265,8 @@ impl MaterialsStorage {
 pub type MaterialId = usize;
 
 pub struct MaterialRenderData {
-	pub path: PathBuf, /// used to make sure the same data isn't loaded multiple times
+	/// `path` is used to make sure the same data isn't loaded multiple times
+	pub path: PathBuf,
 	pub view: wgpu::TextureView,
 }
 
@@ -306,15 +312,15 @@ pub struct CameraRenderData {
 
 pub struct RenderBindings {
 	
-	// shadow_caster render data
-	pub shadow_caster_bind_0: wgpu::BindGroup,
+	// general render data
+	pub bind_0: wgpu::BindGroup,
+	
+	// shadow_caster render data (empty)
 	
 	// models render data
-	pub models_bind_0: wgpu::BindGroup,
 	pub example_models_bind_1s: Vec<wgpu::BindGroup>, // corresponds to the vec in render_assets.example_models.meshes
 	
-	// skybox render data
-	pub skybox_bind_0: wgpu::BindGroup,
+	// skybox render data (empty)
 	
 }
 

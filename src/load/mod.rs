@@ -166,8 +166,8 @@ pub fn read_hjson_f64(map: &Map<String, Value>, key: &'static str, default: f64)
 
 
 
+/// this is just random data as an example
 pub fn load_example_model_instances_data() -> Vec<InstanceData> {
-	/// this is just random data as an example
 	const X_LEN: usize = 100;
 	const Z_LEN: usize = 100;
 	let mut output = Vec::with_capacity(X_LEN * Z_LEN);

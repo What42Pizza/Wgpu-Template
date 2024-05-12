@@ -1,4 +1,4 @@
-@group(0) @binding(0) var<uniform> proj_mat: mat4x4f;
+@group(0) @binding(2) var<uniform> proj_mat: mat4x4f;
 
 struct BasicVertexInput {
 	@location(0) position: vec3f,
