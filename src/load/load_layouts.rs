@@ -4,9 +4,46 @@ use crate::prelude::*;
 
 pub fn load_render_layouts(render_context: &RenderContextData) -> Result<RenderLayouts> {
 	
+	let (
+		shadow_caster_pipeline,
+		shadow_caster_bind_0_layout,
+	) = load_shadow_caster_layouts(render_context)?;
 	
+	let (
+		models_pipeline,
+		models_bind_0_layout,
+		models_bind_1_layout,
+	) = load_models_layouts(render_context)?;
 	
-	// shadow caster
+	let (
+		skybox_pipeline,
+		skybox_bind_0_layout,
+	) = load_skybox_layouts(render_context)?;
+	
+	Ok(RenderLayouts {
+		
+		shadow_caster_pipeline,
+		shadow_caster_bind_0_layout,
+		
+		models_pipeline,
+		models_bind_0_layout,
+		models_bind_1_layout,
+		
+		skybox_pipeline,
+		skybox_bind_0_layout
+		
+	})
+}
+
+
+
+
+
+pub fn load_shadow_caster_layouts(render_context: &RenderContextData) -> Result<(
+	wgpu::RenderPipeline,
+	wgpu::BindGroupLayout,
+)> {
+	
 	
 	let shadow_caster_shader_path = utils::get_program_file_path("shaders/shadow caster.wgsl");
 	let shadow_caster_shader_source = fs::read_to_string(&shadow_caster_shader_path).add_path_to_error(&shadow_caster_shader_path)?;
@@ -14,6 +51,7 @@ pub fn load_render_layouts(render_context: &RenderContextData) -> Result<RenderL
 		label: Some("shadow_caster_shader_module"),
 		source: wgpu::ShaderSource::Wgsl(shadow_caster_shader_source.into()),
 	});
+	
 	
 	let shadow_caster_bind_0_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 		label: Some("shadow_caster_bind_0_layout"),
@@ -30,6 +68,7 @@ pub fn load_render_layouts(render_context: &RenderContextData) -> Result<RenderL
 			},
 		]
 	});
+	
 	
 	let shadow_caster_pipeline_layout = render_context.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 		label: Some("shadow_caster_pipeline_layout"),
@@ -81,8 +120,22 @@ pub fn load_render_layouts(render_context: &RenderContextData) -> Result<RenderL
 	});
 	
 	
+	Ok((
+		shadow_caster_pipeline,
+		shadow_caster_bind_0_layout,
+	))
+}
+
+
+
+
+
+pub fn load_models_layouts(render_context: &RenderContextData) -> Result<(
+	wgpu::RenderPipeline,
+	wgpu::BindGroupLayout,
+	wgpu::BindGroupLayout,
+)> {
 	
-	// models
 	
 	let models_shader_path = utils::get_program_file_path("shaders/models.wgsl");
 	let models_shader_source = fs::read_to_string(&models_shader_path).add_path_to_error(&models_shader_path)?;
@@ -90,6 +143,7 @@ pub fn load_render_layouts(render_context: &RenderContextData) -> Result<RenderL
 		label: Some("models_shader_module"),
 		source: wgpu::ShaderSource::Wgsl(models_shader_source.into()),
 	});
+	
 	
 	let models_bind_0_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 		label: Some("models_bind_0_layout"),
@@ -145,6 +199,7 @@ pub fn load_render_layouts(render_context: &RenderContextData) -> Result<RenderL
 		]
 	});
 	
+	
 	let models_bind_1_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 		label: Some("models_bind_1_layout"),
 		entries: &[
@@ -160,6 +215,7 @@ pub fn load_render_layouts(render_context: &RenderContextData) -> Result<RenderL
 			},
 		],
 	});
+	
 	
 	let models_pipeline_layout = render_context.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 		label: Some("Models Render Pipeline"),
@@ -217,8 +273,22 @@ pub fn load_render_layouts(render_context: &RenderContextData) -> Result<RenderL
 	});
 	
 	
+	Ok((
+		models_pipeline,
+		models_bind_0_layout,
+		models_bind_1_layout,
+	))
+}
+
+
+
+
+
+pub fn load_skybox_layouts(render_context: &RenderContextData) -> Result<(
+	wgpu::RenderPipeline,
+	wgpu::BindGroupLayout,
+)> {
 	
-	// skybox
 	
 	let shader_path = utils::get_program_file_path("shaders/skybox.wgsl");
 	let shader_source = fs::read_to_string(&shader_path).add_path_to_error(&shader_path)?;
@@ -226,6 +296,7 @@ pub fn load_render_layouts(render_context: &RenderContextData) -> Result<RenderL
 		label: Some("Skybox Render Pipeline"),
 		source: wgpu::ShaderSource::Wgsl(shader_source.into()),
 	});
+	
 	
 	let skybox_bind_0_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 		label: Some("skybox_bind_0_layout"),
@@ -259,6 +330,7 @@ pub fn load_render_layouts(render_context: &RenderContextData) -> Result<RenderL
 		],
 	});
 	
+	
 	let skybox_pipeline_layout = render_context.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 		label: Some("skybox_pipeline_layout"),
 		bind_group_layouts: &[
@@ -266,7 +338,6 @@ pub fn load_render_layouts(render_context: &RenderContextData) -> Result<RenderL
 		],
 		push_constant_ranges: &[],
 	});
-	
 	let skybox_pipeline = render_context.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
 		label: Some("skybox_pipeline"),
 		layout: Some(&skybox_pipeline_layout),
@@ -311,18 +382,8 @@ pub fn load_render_layouts(render_context: &RenderContextData) -> Result<RenderL
 	});
 	
 	
-	
-	Ok(RenderLayouts {
-		
-		shadow_caster_pipeline,
-		shadow_caster_bind_0_layout,
-		
-		models_pipeline,
-		models_bind_0_layout,
-		models_bind_1_layout,
-		
+	Ok((
 		skybox_pipeline,
-		skybox_bind_0_layout
-		
-	})
+		skybox_bind_0_layout,
+	))
 }

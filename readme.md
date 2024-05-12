@@ -10,8 +10,8 @@ I don't exactly expect others to want to use this, but it'll still be very usefu
 
 ## Current Features:
 
-- **Model Loading**
-- **Skyboxes**
+- **Model Loading and Rendering**
+- **Skybox Loading and Rendering**
 - **Shadows** (soon, hopefully)
 - **Text render** (soon, hopefully)
 - **Post-Processing** (soon, hopefully)

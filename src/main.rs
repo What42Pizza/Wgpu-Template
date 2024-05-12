@@ -13,6 +13,7 @@
 #![allow(unused)]
 #![warn(unused_must_use)]
 
+#![allow(unused_doc_comments)]
 #![allow(clippy::new_without_default)]
 #![warn(clippy::todo)]
 #![deny(clippy::unwrap_used, clippy::panic)]
@@ -281,7 +282,7 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 		
 		let input = &mut program_data.input;
 		input.prev_mouse_pos = input.mouse_pos;
-		input.prev_pressed_keys = input.pressed_keys.clone();
+		input.prev_pressed_keys.clone_from(&input.pressed_keys);
 		
 		
 	}

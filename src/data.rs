@@ -13,6 +13,7 @@ pub struct ProgramData<'a> {
 	// app data
 	pub camera_data: CameraData,
 	pub shadow_caster_data: ShadowCasterData,
+	pub example_model_instances_data: Vec<InstanceData>,
 	pub fps_counter: FpsCounter,
 	
 	// render data

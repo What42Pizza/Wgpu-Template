@@ -21,13 +21,14 @@ pub fn render(output: &wgpu::SurfaceTexture, program_data: &mut ProgramData) {
 pub fn render_shadow_caster_pipeline(program_data: &ProgramData, encoder: &mut wgpu::CommandEncoder) {
 	let render_assets = &program_data.render_assets;
 	
+	// I've tried to move these RenderPassDescriptor-s to `load_layouts.rs`, but the complexity required just isn't worth it
 	let mut shadow_caster_pass_handle = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
 		label: Some("shadow_caster_render_pass"),
 		color_attachments: &[],
 		depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
 			view: &render_assets.depth.view,
 			depth_ops: Some(wgpu::Operations {
-				load: wgpu::LoadOp::Clear(1.0),
+				load: wgpu::LoadOp::Clear (1.0),
 				store: wgpu::StoreOp::Store,
 			}),
 			stencil_ops: None,
@@ -57,12 +58,12 @@ pub fn render_models_pipeline(program_data: &ProgramData, encoder: &mut wgpu::Co
 	let render_assets = &program_data.render_assets;
 	
 	let mut models_pass_handle = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-		label: Some("Models Render Pass"),
+		label: Some("models_render_pass"),
 		color_attachments: &[Some(wgpu::RenderPassColorAttachment {
 			view: output_view,
 			resolve_target: None,
 			ops: wgpu::Operations {
-				load: wgpu::LoadOp::Clear(wgpu::Color {
+				load: wgpu::LoadOp::Clear (wgpu::Color {
 					r: 0.1,
 					g: 0.2,
 					b: 0.3,
@@ -74,7 +75,7 @@ pub fn render_models_pipeline(program_data: &ProgramData, encoder: &mut wgpu::Co
 		depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
 			view: &render_assets.depth.view,
 			depth_ops: Some(wgpu::Operations {
-				load: wgpu::LoadOp::Clear(1.0),
+				load: wgpu::LoadOp::Clear (1.0),
 				store: wgpu::StoreOp::Store,
 			}),
 			stencil_ops: None,
@@ -105,7 +106,7 @@ pub fn render_skybox_pipeline(program_data: &ProgramData, encoder: &mut wgpu::Co
 	let render_assets = &program_data.render_assets;
 	
 	let mut skybox_pass_handle = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-		label: Some("Skybox Render Pass"),
+		label: Some("skybox_render_pass"),
 		color_attachments: &[Some(wgpu::RenderPassColorAttachment {
 			view: output_view,
 			resolve_target: None,

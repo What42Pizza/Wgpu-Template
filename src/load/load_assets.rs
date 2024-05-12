@@ -7,6 +7,7 @@ use wgpu::util::DeviceExt;
 pub fn load_render_assets(
 	camera_data: &CameraData,
 	shadow_caster_data: &ShadowCasterData,
+	example_model_instances_data: &[InstanceData],
 	render_context: &RenderContextData,
 	shadowmap_size: u32,
 ) -> Result<RenderAssets> {
@@ -29,7 +30,7 @@ pub fn load_render_assets(
 	let shadow_caster = load_shadow_caster_data(render_context, shadowmap_size, shadow_caster_data, camera_data).context("Failed to load shadow caster render data.")?;
 	
 	// models render data
-	let example_models = load_example_models_render_data(render_context, &mut materials_storage).context("Failed to load model render data.")?;
+	let example_models = load_example_models_render_data(render_context, &mut materials_storage, example_model_instances_data).context("Failed to load model render data.")?;
 	
 	// skybox render data
 	let skybox_material_id = load_skybox_material(render_context, &mut materials_storage).context("Failed to load skybox render data.")?;
@@ -184,39 +185,23 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 pub fn load_example_models_render_data(
 	render_context: &RenderContextData,
 	materials_storage: &mut MaterialsStorage,
+	instances_data: &[InstanceData],
 ) -> Result<ModelsRenderData> {
 	
 	let example_model_meshes = load_model(utils::get_program_file_path("assets/cube.obj"), render_context, materials_storage)?;
 	
-	let example_model_instances = (0..100).flat_map(|z| {
-		(0..100).map(move |x| {
-			let position = glam::Vec3 { x: x as f32 * 3.0, y: 0.0, z: z as f32 * 3.0 } - glam::Vec3::new(0.5, 0.0, 0.5);
-			
-			let rotation = if position == glam::Vec3::ZERO {
-				glam::Quat::from_axis_angle(glam::Vec3::Z, 0.0)
-			} else {
-				glam::Quat::from_axis_angle(position.normalize(), std::f32::consts::PI * 0.25)
-			};
-			
-			InstanceData {
-				position,
-				rotation,
-			}
-		})
-	}).collect::<Vec<_>>();
-	
-	let example_model_instances_data = example_model_instances.iter().map(InstanceData::to_raw).collect::<Vec<_>>();
-	let example_model_instances_buffer = render_context.device.create_buffer_init(
+	let example_model_instances_data = instances_data.iter().map(InstanceData::to_raw).collect::<Vec<_>>();
+	let instances_buffer = render_context.device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
-			label: Some("Instance Buffer"),
+			label: Some("example_models_instances_buffer"),
 			contents: bytemuck::cast_slice(&example_model_instances_data),
 			usage: wgpu::BufferUsages::VERTEX,
 		}
 	);
 	
 	Ok(ModelsRenderData {
-		instances_buffer: example_model_instances_buffer,
-		instances_count: example_model_instances.len() as u32,
+		instances_buffer,
+		instances_count: instances_data.len() as u32,
 		meshes: example_model_meshes,
 	})
 }
@@ -229,7 +214,7 @@ pub fn load_model(
 	materials_storage: &mut MaterialsStorage,
 ) -> Result<Vec<MeshRenderData>> {
 	let file_path = file_path.as_ref();
-	let obj_text = fs::read_to_string(file_path).add_path_to_error(&file_path)?;
+	let obj_text = fs::read_to_string(file_path).add_path_to_error(file_path)?;
 	let obj_cursor = Cursor::new(obj_text);
 	let mut obj_reader = BufReader::new(obj_cursor);
 	let parent_folder = file_path.parent().expect("Cannot load mesh at root directory");
@@ -255,6 +240,7 @@ pub fn load_model(
 	for material in model_materials {
 		let Some(diffuse_texture_name) = material.diffuse_texture else {
 			warn!("diffuse texture in material is `None`.");
+			material_ids.push(0);
 			continue;
 		};
 		let path = parent_folder.join(&diffuse_texture_name);

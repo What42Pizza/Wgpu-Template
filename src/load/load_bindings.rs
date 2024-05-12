@@ -79,7 +79,7 @@ pub fn load_render_bindings(render_context: &RenderContextData, render_layouts: 
 			},
 			wgpu::BindGroupEntry {
 				binding: 1,
-				resource: wgpu::BindingResource::TextureView (&skybox_view),
+				resource: wgpu::BindingResource::TextureView (skybox_view),
 			},
 			wgpu::BindGroupEntry {
 				binding: 2,
