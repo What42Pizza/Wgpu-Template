@@ -69,7 +69,7 @@ pub fn load_camera_render_data(render_context: &RenderContextData, camera_data: 
 	
 	let buffer = render_context.device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
-			label: Some("Camera Buffer"),
+			label: Some("camera_buffer"),
 			contents: bytemuck::cast_slice(&camera_data.build_gpu_data(render_context.aspect_ratio)),
 			usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
 		}
@@ -92,7 +92,7 @@ pub fn load_depth_render_data(render_context: &RenderContextData) -> DepthRender
 		depth_or_array_layers: 1,
 	};
 	let desc = wgpu::TextureDescriptor {
-		label: Some("Depth Texture"),
+		label: Some("depth_tex"),
 		size,
 		mip_level_count: 1,
 		sample_count: 1,
@@ -132,16 +132,7 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 		view_formats: &[],
 	};
 	let depth_tex = render_context.device.create_texture(&desc);
-	let depth_tex_view = depth_tex.create_view(&wgpu::TextureViewDescriptor {
-		label: None,
-		format: None,
-		dimension: Some(wgpu::TextureViewDimension::D2),
-		aspect: wgpu::TextureAspect::All,
-		base_mip_level: 0,
-		mip_level_count: None,
-		base_array_layer: 0,
-		array_layer_count: None,
-	});
+	let depth_tex_view = depth_tex.create_view(&wgpu::TextureViewDescriptor::default());
 	let depth_sampler = render_context.device.create_sampler(&wgpu::SamplerDescriptor {
 		address_mode_u: wgpu::AddressMode::ClampToEdge,
 		address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -164,7 +155,7 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 	
 	let proj_mat_buffer = render_context.device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
-			label: Some("Shadow Caster Buffer"),
+			label: Some("shadow_caster_buffer"),
 			contents: bytemuck::cast_slice(&shadow_caster_data.build_gpu_data(camera_data.pos)),
 			usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
 		}
@@ -276,17 +267,17 @@ pub fn load_model(
 			}
 			
 			let basic_vertex_buffer = render_context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-				label: Some(&format!("{:?} Basic Vertex Buffer", &file_path)),
+				label: Some(&format!("'{:?}'_basic_vertex_buffer", &file_path)),
 				contents: bytemuck::cast_slice(&basic_vertices),
 				usage: wgpu::BufferUsages::VERTEX,
 			});
 			let extended_vertex_buffer = render_context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-				label: Some(&format!("{:?} Extended Vertex Buffer", &file_path)),
+				label: Some(&format!("'{:?}'_extended_vertex_buffer", &file_path)),
 				contents: bytemuck::cast_slice(&extended_vertices),
 				usage: wgpu::BufferUsages::VERTEX,
 			});
 			let index_buffer = render_context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-				label: Some(&format!("{:?} Index Buffer", &file_path)),
+				label: Some(&format!("'{:?}'_index_buffer", &file_path)),
 				contents: bytemuck::cast_slice(&model.mesh.indices),
 				usage: wgpu::BufferUsages::INDEX,
 			});
