@@ -4,108 +4,33 @@ use crate::prelude::*;
 
 pub fn load_render_layouts(render_context: &RenderContextData) -> Result<RenderLayouts> {
 	
-	let bind_0_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-		label: Some("bind_0_layout"),
-		entries: &[
-			
-			// basics
-			wgpu::BindGroupLayoutEntry { // camera: proj_view_mat, inv_proj_mat, view_mat
-				binding: 0,
-				visibility: wgpu::ShaderStages::VERTEX,
-				ty: wgpu::BindingType::Buffer {
-					ty: wgpu::BufferBindingType::Uniform,
-					has_dynamic_offset: false,
-					min_binding_size: None,
-				},
-				count: None,
-			},
-			wgpu::BindGroupLayoutEntry { // models: sampler
-				binding: 1,
-				visibility: wgpu::ShaderStages::FRAGMENT,
-				ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Filtering),
-				count: None,
-			},
-			
-			// shadow_caster
-			wgpu::BindGroupLayoutEntry { // shadow_caster: proj_mat
-				binding: 2,
-				visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
-				ty: wgpu::BindingType::Buffer {
-					ty: wgpu::BufferBindingType::Uniform,
-					has_dynamic_offset: false,
-					min_binding_size: None,
-				},
-				count: None,
-			},
-			wgpu::BindGroupLayoutEntry { // shadowmap: tex_view
-				binding: 3,
-				visibility: wgpu::ShaderStages::FRAGMENT,
-				ty: wgpu::BindingType::Texture {
-					multisampled: false,
-					view_dimension: wgpu::TextureViewDimension::D2,
-					sample_type: wgpu::TextureSampleType::Depth,
-				},
-				count: None,
-			},
-			wgpu::BindGroupLayoutEntry { // shadowmap: sampler
-				binding: 4,
-				visibility: wgpu::ShaderStages::FRAGMENT,
-				ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Comparison),
-				count: None,
-			},
-			wgpu::BindGroupLayoutEntry { // shadowmap: debug_sampler
-				binding: 5,
-				visibility: wgpu::ShaderStages::FRAGMENT,
-				ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Filtering),
-				count: None,
-			},
-			
-			// skybox
-			wgpu::BindGroupLayoutEntry { // skybox: tex_view
-				binding: 6,
-				visibility: wgpu::ShaderStages::FRAGMENT,
-				ty: wgpu::BindingType::Texture {
-					multisampled: false,
-					view_dimension: wgpu::TextureViewDimension::Cube,
-					sample_type: wgpu::TextureSampleType::Float { filterable: true },
-				},
-				count: None,
-			},
-			wgpu::BindGroupLayoutEntry { // skybox: sampler
-				binding: 7,
-				visibility: wgpu::ShaderStages::FRAGMENT,
-				ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Filtering),
-				count: None,
-			},
-			
-		]
-	});
-	
-	
 	let (
 		shadow_caster_pipeline,
-	) = load_shadow_caster_layouts(render_context, &bind_0_layout)?;
+		shadow_caster_bind_0_layout,
+	) = load_shadow_caster_layouts(render_context)?;
 	
 	let (
 		models_pipeline,
+		models_bind_0_layout,
 		models_bind_1_layout,
-	) = load_models_layouts(render_context, &bind_0_layout)?;
+	) = load_models_layouts(render_context)?;
 	
 	let (
 		skybox_pipeline,
-	) = load_skybox_layouts(render_context, &bind_0_layout)?;
-	
+		skybox_bind_0_layout,
+	) = load_skybox_layouts(render_context)?;
 	
 	Ok(RenderLayouts {
 		
-		bind_0_layout,
-		
 		shadow_caster_pipeline,
+		shadow_caster_bind_0_layout,
 		
 		models_pipeline,
+		models_bind_0_layout,
 		models_bind_1_layout,
 		
 		skybox_pipeline,
+		skybox_bind_0_layout
 		
 	})
 }
@@ -114,8 +39,9 @@ pub fn load_render_layouts(render_context: &RenderContextData) -> Result<RenderL
 
 
 
-pub fn load_shadow_caster_layouts(render_context: &RenderContextData, bind_0_layout: &wgpu::BindGroupLayout) -> Result<(
+pub fn load_shadow_caster_layouts(render_context: &RenderContextData) -> Result<(
 	wgpu::RenderPipeline,
+	wgpu::BindGroupLayout,
 )> {
 	
 	
@@ -127,10 +53,27 @@ pub fn load_shadow_caster_layouts(render_context: &RenderContextData, bind_0_lay
 	});
 	
 	
+	let shadow_caster_bind_0_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+		label: Some("shadow_caster_bind_0_layout"),
+		entries: &[
+			wgpu::BindGroupLayoutEntry { // shadow_caster: proj_mat
+				binding: 0,
+				visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+				ty: wgpu::BindingType::Buffer {
+					ty: wgpu::BufferBindingType::Uniform,
+					has_dynamic_offset: false,
+					min_binding_size: None,
+				},
+				count: None,
+			},
+		]
+	});
+	
+	
 	let shadow_caster_pipeline_layout = render_context.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 		label: Some("shadow_caster_pipeline_layout"),
 		bind_group_layouts: &[
-			&bind_0_layout,
+			&shadow_caster_bind_0_layout,
 		],
 		push_constant_ranges: &[],
 	});
@@ -179,6 +122,7 @@ pub fn load_shadow_caster_layouts(render_context: &RenderContextData, bind_0_lay
 	
 	Ok((
 		shadow_caster_pipeline,
+		shadow_caster_bind_0_layout,
 	))
 }
 
@@ -186,8 +130,9 @@ pub fn load_shadow_caster_layouts(render_context: &RenderContextData, bind_0_lay
 
 
 
-pub fn load_models_layouts(render_context: &RenderContextData, bind_0_layout: &wgpu::BindGroupLayout) -> Result<(
+pub fn load_models_layouts(render_context: &RenderContextData) -> Result<(
 	wgpu::RenderPipeline,
+	wgpu::BindGroupLayout,
 	wgpu::BindGroupLayout,
 )> {
 	
@@ -200,10 +145,65 @@ pub fn load_models_layouts(render_context: &RenderContextData, bind_0_layout: &w
 	});
 	
 	
+	let models_bind_0_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+		label: Some("models_bind_0_layout"),
+		entries: &[
+			wgpu::BindGroupLayoutEntry { // camera: proj_view_mat, inv_proj_mat, view_mat
+				binding: 0,
+				visibility: wgpu::ShaderStages::VERTEX,
+				ty: wgpu::BindingType::Buffer {
+					ty: wgpu::BufferBindingType::Uniform,
+					has_dynamic_offset: false,
+					min_binding_size: None,
+				},
+				count: None,
+			},
+			wgpu::BindGroupLayoutEntry { // shadow_caster: proj_mat
+				binding: 1,
+				visibility: wgpu::ShaderStages::FRAGMENT,
+				ty: wgpu::BindingType::Buffer {
+					ty: wgpu::BufferBindingType::Uniform,
+					has_dynamic_offset: false,
+					min_binding_size: None,
+				},
+				count: None,
+			},
+			wgpu::BindGroupLayoutEntry { // material: sampler
+				binding: 2,
+				visibility: wgpu::ShaderStages::FRAGMENT,
+				ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Filtering),
+				count: None,
+			},
+			wgpu::BindGroupLayoutEntry { // shadowmap: texture
+				binding: 3,
+				visibility: wgpu::ShaderStages::FRAGMENT,
+				ty: wgpu::BindingType::Texture {
+					multisampled: false,
+					view_dimension: wgpu::TextureViewDimension::D2,
+					sample_type: wgpu::TextureSampleType::Depth,
+				},
+				count: None,
+			},
+			wgpu::BindGroupLayoutEntry { // shadowmap: sampler
+				binding: 4,
+				visibility: wgpu::ShaderStages::FRAGMENT,
+				ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Comparison),
+				count: None,
+			},
+			wgpu::BindGroupLayoutEntry { // shadowmap: debug_sampler
+				binding: 5,
+				visibility: wgpu::ShaderStages::FRAGMENT,
+				ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Filtering),
+				count: None,
+			},
+		]
+	});
+	
+	
 	let models_bind_1_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 		label: Some("models_bind_1_layout"),
 		entries: &[
-			wgpu::BindGroupLayoutEntry { // models: tex_iew
+			wgpu::BindGroupLayoutEntry { // material: view
 				binding: 0,
 				visibility: wgpu::ShaderStages::FRAGMENT,
 				ty: wgpu::BindingType::Texture {
@@ -220,7 +220,7 @@ pub fn load_models_layouts(render_context: &RenderContextData, bind_0_layout: &w
 	let models_pipeline_layout = render_context.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 		label: Some("models_render_pipeline_layout"),
 		bind_group_layouts: &[
-			&bind_0_layout,
+			&models_bind_0_layout,
 			&models_bind_1_layout,
 		],
 		push_constant_ranges: &[],
@@ -275,6 +275,7 @@ pub fn load_models_layouts(render_context: &RenderContextData, bind_0_layout: &w
 	
 	Ok((
 		models_pipeline,
+		models_bind_0_layout,
 		models_bind_1_layout,
 	))
 }
@@ -283,8 +284,9 @@ pub fn load_models_layouts(render_context: &RenderContextData, bind_0_layout: &w
 
 
 
-pub fn load_skybox_layouts(render_context: &RenderContextData, bind_0_layout: &wgpu::BindGroupLayout) -> Result<(
+pub fn load_skybox_layouts(render_context: &RenderContextData) -> Result<(
 	wgpu::RenderPipeline,
+	wgpu::BindGroupLayout,
 )> {
 	
 	
@@ -296,10 +298,43 @@ pub fn load_skybox_layouts(render_context: &RenderContextData, bind_0_layout: &w
 	});
 	
 	
+	let skybox_bind_0_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+		label: Some("skybox_bind_0_layout"),
+		entries: &[
+			wgpu::BindGroupLayoutEntry { // camera: proj_view_mat, inv_proj_mat, view_mat
+				binding: 0,
+				visibility: wgpu::ShaderStages::VERTEX,
+				ty: wgpu::BindingType::Buffer {
+					ty: wgpu::BufferBindingType::Uniform,
+					has_dynamic_offset: false,
+					min_binding_size: None,
+				},
+				count: None,
+			},
+			wgpu::BindGroupLayoutEntry { // skybox: texture
+				binding: 1,
+				visibility: wgpu::ShaderStages::FRAGMENT,
+				ty: wgpu::BindingType::Texture {
+					multisampled: false,
+					view_dimension: wgpu::TextureViewDimension::Cube,
+					sample_type: wgpu::TextureSampleType::Float { filterable: true },
+				},
+				count: None,
+			},
+			wgpu::BindGroupLayoutEntry { // skybox: sampler
+				binding: 2,
+				visibility: wgpu::ShaderStages::FRAGMENT,
+				ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Filtering),
+				count: None,
+			},
+		],
+	});
+	
+	
 	let skybox_pipeline_layout = render_context.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 		label: Some("skybox_pipeline_layout"),
 		bind_group_layouts: &[
-			&bind_0_layout,
+			&skybox_bind_0_layout,
 		],
 		push_constant_ranges: &[],
 	});
@@ -349,5 +384,6 @@ pub fn load_skybox_layouts(render_context: &RenderContextData, bind_0_layout: &w
 	
 	Ok((
 		skybox_pipeline,
+		skybox_bind_0_layout,
 	))
 }

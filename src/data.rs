@@ -203,25 +203,20 @@ pub struct RenderContextData<'a> {
 
 
 
-/// Wgpu's wiki says that bind group 0 should hold per-frame data, bind group 1 holds
-/// per-pass data, and bind group 2 holds per-draw data. Meaning, bind group 0 should be
-/// replaced every frame, bind group 1 should be replaced every render pass (if needed),
-/// and bind group 2 should be replaced every draw call (if needed).
-
 pub struct RenderLayouts {
-	
-	// general render data
-	pub bind_0_layout: wgpu::BindGroupLayout,
 	
 	// shadow_caster render data
 	pub shadow_caster_pipeline: wgpu::RenderPipeline,
+	pub shadow_caster_bind_0_layout: wgpu::BindGroupLayout,
 	
 	// models render data
 	pub models_pipeline: wgpu::RenderPipeline,
+	pub models_bind_0_layout: wgpu::BindGroupLayout,
 	pub models_bind_1_layout: wgpu::BindGroupLayout,
 	
 	// skybox render data
 	pub skybox_pipeline: wgpu::RenderPipeline,
+	pub skybox_bind_0_layout: wgpu::BindGroupLayout,
 	
 }
 
@@ -312,15 +307,15 @@ pub struct CameraRenderData {
 
 pub struct RenderBindings {
 	
-	// general render data
-	pub bind_0: wgpu::BindGroup,
-	
-	// shadow_caster render data (empty)
+	// shadow_caster render data
+	pub shadow_caster_bind_0: wgpu::BindGroup,
 	
 	// models render data
+	pub models_bind_0: wgpu::BindGroup,
 	pub example_models_bind_1s: Vec<wgpu::BindGroup>, // corresponds to the vec in render_assets.example_models.meshes
 	
-	// skybox render data (empty)
+	// skybox render data
+	pub skybox_bind_0: wgpu::BindGroup,
 	
 }
 

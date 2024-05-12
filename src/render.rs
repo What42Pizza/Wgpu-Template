@@ -26,7 +26,7 @@ pub fn render_shadow_caster_pipeline(program_data: &ProgramData, encoder: &mut w
 		label: Some("shadow_caster_render_pass"),
 		color_attachments: &[],
 		depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-			view: &render_assets.depth.view,
+			view: &render_assets.shadow_caster.depth_tex_view,
 			depth_ops: Some(wgpu::Operations {
 				load: wgpu::LoadOp::Clear (1.0),
 				store: wgpu::StoreOp::Store,
@@ -38,7 +38,7 @@ pub fn render_shadow_caster_pipeline(program_data: &ProgramData, encoder: &mut w
 	});
 	
 	shadow_caster_pass_handle.set_pipeline(&program_data.render_layouts.shadow_caster_pipeline);
-	shadow_caster_pass_handle.set_bind_group(0, &program_data.render_bindings.bind_0, &[]);
+	shadow_caster_pass_handle.set_bind_group(0, &program_data.render_bindings.shadow_caster_bind_0, &[]);
 	
 	for mesh in &render_assets.example_models.meshes {
 		shadow_caster_pass_handle.set_vertex_buffer(0, mesh.basic_vertex_buffer.slice(..));
@@ -85,7 +85,7 @@ pub fn render_models_pipeline(program_data: &ProgramData, encoder: &mut wgpu::Co
 	});
 	
 	models_pass_handle.set_pipeline(&program_data.render_layouts.models_pipeline);
-	models_pass_handle.set_bind_group(0, &program_data.render_bindings.bind_0, &[]);
+	models_pass_handle.set_bind_group(0, &program_data.render_bindings.models_bind_0, &[]);
 	
 	for (i, mesh) in program_data.render_assets.example_models.meshes.iter().enumerate() {
 		models_pass_handle.set_bind_group(1, &program_data.render_bindings.example_models_bind_1s[i], &[]);
@@ -128,7 +128,7 @@ pub fn render_skybox_pipeline(program_data: &ProgramData, encoder: &mut wgpu::Co
 	});
 	
 	skybox_pass_handle.set_pipeline(&program_data.render_layouts.skybox_pipeline);
-	skybox_pass_handle.set_bind_group(0, &program_data.render_bindings.bind_0, &[]);
+	skybox_pass_handle.set_bind_group(0, &program_data.render_bindings.skybox_bind_0, &[]);
 	
 	skybox_pass_handle.draw(0..3, 0..1)
 	
