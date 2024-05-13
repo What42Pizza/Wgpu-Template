@@ -12,7 +12,7 @@ I don't exactly expect others to want to use this, but it'll still be very usefu
 
 - **Model Loading and Rendering**
 - **Skybox Loading and Rendering**
-- **Shadows** (soon, hopefully)
+- **Shadows**
 - **Text render** (soon, hopefully)
 - **Post-Processing** (soon, hopefully)
 - **Texture Compression** (soon, possibly)

@@ -95,7 +95,7 @@ pub fn load_shadow_caster_layouts(render_context: &RenderContextData) -> Result<
 			topology: wgpu::PrimitiveTopology::TriangleList,
 			strip_index_format: None,
 			front_face: wgpu::FrontFace::Ccw,
-			cull_mode: Some(wgpu::Face::Back),
+			cull_mode: Some(wgpu::Face::Front), // I'm not exactly sure why this needs to be different from the models pipeline
 			polygon_mode: wgpu::PolygonMode::Fill,
 			unclipped_depth: false,
 			conservative: false,
@@ -188,12 +188,6 @@ pub fn load_models_layouts(render_context: &RenderContextData) -> Result<(
 				binding: 4,
 				visibility: wgpu::ShaderStages::FRAGMENT,
 				ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Comparison),
-				count: None,
-			},
-			wgpu::BindGroupLayoutEntry { // shadowmap: debug_sampler
-				binding: 5,
-				visibility: wgpu::ShaderStages::FRAGMENT,
-				ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Filtering),
 				count: None,
 			},
 		]

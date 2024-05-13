@@ -181,6 +181,16 @@ pub fn load_example_model_instances_data() -> Vec<InstanceData> {
 			})
 		}
 	}
+	for z in 0..Z_LEN {
+		for x in 0..X_LEN {
+			let position = glam::Vec3 { x: x as f32 * 3.0, y: 10.0, z: z as f32 * 3.0 } - glam::Vec3::new(0.5, 0.0, 0.5);
+			let rotation = glam::Quat::from_euler(glam::EulerRot::XYZ, position.x / 10.0, position.y / 10.0, position.z / 10.0);
+			output.push(InstanceData {
+				position,
+				rotation,
+			})
+		}
+	}
 	output
 }
 

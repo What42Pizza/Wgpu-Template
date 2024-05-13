@@ -33,7 +33,6 @@ fn vs_main(
 	);
 	
 	var out = proj_mat * instance_mat * vec4(vertex_basic.position, 1.0);
-	out = vec4(out.xyz / out.w, 1.0); // idk if this is needed
 	out.z = out.z * 0.5 + 0.5;
 	return out;
 }

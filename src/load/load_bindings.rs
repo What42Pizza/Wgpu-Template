@@ -43,10 +43,6 @@ pub fn load_render_bindings(render_context: &RenderContextData, render_layouts: 
 				binding: 4,
 				resource: wgpu::BindingResource::Sampler (&render_assets.shadow_caster.depth_sampler),
 			},
-			wgpu::BindGroupEntry {
-				binding: 5,
-				resource: wgpu::BindingResource::Sampler (&render_assets.shadow_caster.debug_depth_sampler),
-			},
 		],
 	});
 	

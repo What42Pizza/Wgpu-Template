@@ -1,9 +1,8 @@
 @group(0) @binding(0) var<uniform> camera_data: CameraData;
-@group(0) @binding(1) var<uniform> shadowmap_proj_mat: mat4x4f;
+@group(0) @binding(1) var<uniform> shadow_caster_proj_mat: mat4x4f;
 @group(0) @binding(2) var material_sampler: sampler;
 @group(0) @binding(3) var shadowmap_texture: texture_depth_2d;
 @group(0) @binding(4) var shadowmap_sampler: sampler_comparison;
-@group(0) @binding(5) var deubg_shadowmap_sampler: sampler;
 
 struct CameraData {
 	proj_view_mat: mat4x4f,
@@ -44,10 +43,9 @@ fn vs_main(
 	);
 	
 	var world_pos = instance_mat * vec4(vertex_basic.position, 1.0);
-	world_pos = vec4(world_pos.xyz / world_pos.w, 1.0); // again, I'm not sure if this is needed
 	
 	var out: VertexOutput;
-	out.screen_pos = camera_data.proj_view_mat * instance_mat * vec4(vertex_basic.position, 1.0);
+	out.screen_pos = camera_data.proj_view_mat * world_pos;
 	out.screen_pos.z = out.screen_pos.z * 0.5 + 0.5;
 	out.world_pos = world_pos.xyz;
 	out.texcoords = vertex_extended.texcoords;
@@ -67,8 +65,7 @@ struct VertexOutput {
 
 
 fn sample_shadows(world_pos: vec3f) -> f32 {
-	var shadowmap_pos = shadowmap_proj_mat * vec4(world_pos, 1.0);
-	shadowmap_pos = vec4(shadowmap_pos.xyz / shadowmap_pos.w, 1.0); // this shouldn't be needed but idk
+	var shadowmap_pos = shadow_caster_proj_mat * vec4(world_pos, 1.0);
 	// shadowmap_pos starts in range -1 to 1 with y going up, but we need 0 to 1 with y going down
 	shadowmap_pos = vec4(shadowmap_pos.xyz * vec3(0.5, -0.5, 0.5) + 0.5, 1.0);
 	return textureSampleCompareLevel(shadowmap_texture, shadowmap_sampler, shadowmap_pos.xy, shadowmap_pos.z);
@@ -81,18 +78,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {
 	let color_a = color.a;
 	
 	let ambient_light = vec3(0.9, 0.9, 1.0) * 0.5;
-	let shadowcaster_light = vec3(100.0, 1.0, 0.9) * sample_shadows(in.world_pos);
+	let shadowcaster_light = vec3(1.0, 0.9, 0.7) * sample_shadows(in.world_pos);
 	color_rgb *= ambient_light + shadowcaster_light;
-	
-	var shadowmap_pos = shadowmap_proj_mat * vec4(in.world_pos, 1.0);
-	shadowmap_pos = vec4(shadowmap_pos.xyz / shadowmap_pos.w, 1.0); // this shouldn't be needed but idk
-	// shadowmap_pos starts in range -1 to 1 with y going up, but we need 0 to 1 with y going down
-	shadowmap_pos = vec4(shadowmap_pos.xyz * vec3(0.5, -0.5, 0.5) + 0.5, 1.0);
-	
-	//let shadowmap_depth = textureSample(shadowmap_texture, deubg_shadowmap_sampler, in.screen_pos.xy / vec2(1280, 720)) * 1000;
-	//return vec4(shadowmap_depth, shadowmap_depth, shadowmap_depth, 1.0);
-	//return vec4(0.0, 0.0, shadowmap_pos.z, 1.0);
-	//return vec4(in.world_pos, 1.0);
 	
 	return vec4(color_rgb, color.a);
 }

@@ -143,15 +143,6 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 		compare: Some(wgpu::CompareFunction::LessEqual),
 		..Default::default()
 	});
-	let debug_depth_sampler = render_context.device.create_sampler(&wgpu::SamplerDescriptor {
-		address_mode_u: wgpu::AddressMode::ClampToEdge,
-		address_mode_v: wgpu::AddressMode::ClampToEdge,
-		address_mode_w: wgpu::AddressMode::ClampToEdge,
-		mag_filter: wgpu::FilterMode::Linear,
-		min_filter: wgpu::FilterMode::Linear,
-		mipmap_filter: wgpu::FilterMode::Nearest,
-		..Default::default()
-	});
 	
 	let proj_mat_buffer = render_context.device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
@@ -164,7 +155,6 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 	Ok(ShadowCasterRenderData {
 		depth_tex_view,
 		depth_sampler,
-		debug_depth_sampler,
 		proj_mat_buffer,
 	})
 }

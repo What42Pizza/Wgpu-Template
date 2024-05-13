@@ -94,6 +94,7 @@ impl CameraData {
 		0.0, 0.0, 0.0, 1.0,
 	]);
 	pub fn build_gpu_data(&self, aspect_ratio: f32) -> [f32; 16 + 16 + 16] {
+		//println!("{} {}", self.rot_xz, self.rot_y);
 		let proj = glam::Mat4::perspective_rh(self.fov, aspect_ratio, 1.0, 50.0);
 		let target = self.pos + glam::Vec3::new(
 			self.rot_xz.cos() * self.rot_y.cos(),
@@ -146,7 +147,7 @@ impl Default for ShadowCasterData {
 		const PI: f32 = std::f32::consts::PI;
 		Self {
 			size: glam::Vec3::new(200.0, 200.0, 200.0),
-			rot: glam::Quat::from_euler(glam::EulerRot::ZXY, PI * 0.25, PI * 0.25, 0.0),
+			rot: glam::Quat::from_euler(glam::EulerRot::YXZ, PI * -0.25, PI * -0.125, 0.0),
 		}
 	}
 }
@@ -291,7 +292,6 @@ pub struct DepthRenderData {
 pub struct ShadowCasterRenderData {
 	pub depth_tex_view: wgpu::TextureView,
 	pub depth_sampler: wgpu::Sampler,
-	pub debug_depth_sampler: wgpu::Sampler,
 	pub proj_mat_buffer: wgpu::Buffer,
 }
 
