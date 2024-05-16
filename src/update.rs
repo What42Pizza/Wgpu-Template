@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use winit::keyboard::KeyCode;
+use winit::{dpi::PhysicalPosition, keyboard::KeyCode};
 
 
 
@@ -7,17 +7,67 @@ pub type ShouldExit = bool;
 
 pub fn update(program_data: &mut ProgramData, dt: f32) -> Result<ShouldExit> {
 	
-	if program_data.input.key_just_pressed(KeyCode::Escape) {
-		return Ok(true);
+	let should_exit = process_pre_frame_inputs(program_data);
+	if should_exit {return Ok(true);}
+	
+	if program_data.input.window_is_focused && program_data.is_moving_camera {
+		let size = program_data.render_context.surface_size;
+		let window_center = PhysicalPosition::new(size.width as f64 / 2.0, size.height as f64 / 2.0);
+		let _ = program_data.render_context.window.set_cursor_position(window_center);
+		program_data.input.prev_mouse_pos = window_center; // pretend like the mouse always starts at the middle of the screen (just think about the case where mouse_pos is constantly a bit away from the center, that would mean the mouse has a consistent velocity)
 	}
 	
-	if program_data.input.is_focused {
+	if program_data.input.window_is_focused && program_data.is_moving_camera {
 		update_camera(program_data, dt);
 	}
 	
 	update_gpu_buffers(program_data);
 	
+	let should_exit = process_post_frame_inputs(program_data);
+	if should_exit {return Ok(true);}
+	
 	Ok(false)
+}
+
+
+
+pub fn process_pre_frame_inputs(program_data: &mut ProgramData) -> ShouldExit {
+	let window = program_data.render_context.window;
+	let input = &program_data.input;
+	let shift_down = input.key_is_down(KeyCode::ShiftLeft) || input.key_is_down(KeyCode::ShiftRight);
+	let control_down = input.key_is_down(KeyCode::ControlLeft) || input.key_is_down(KeyCode::ControlRight);
+	let alt_down = input.key_is_down(KeyCode::AltLeft) || input.key_is_down(KeyCode::AltRight);
+	
+	// ctrl+w exit
+	if control_down && input.key_just_pressed(KeyCode::KeyW) {
+		return true;
+	}
+	
+	// esc to lose camera focus
+	if input.key_just_pressed(KeyCode::Escape) {
+		window.set_cursor_visible(true);
+		program_data.is_moving_camera = false;
+	}
+	
+	false
+}
+
+
+
+pub fn process_post_frame_inputs(program_data: &mut ProgramData) -> ShouldExit {
+	let window = program_data.render_context.window;
+	let input = &program_data.input;
+	
+	// click to gain camera focus
+	if input.button_just_pressed(MouseButton::Left) {
+		window.set_cursor_visible(false);
+		program_data.is_moving_camera = true;
+		let size = program_data.render_context.surface_size;
+		let window_center = PhysicalPosition::new(size.width as f64 / 2.0, size.height as f64 / 2.0);
+		let _ = program_data.render_context.window.set_cursor_position(window_center);
+	}
+	
+	false
 }
 
 
@@ -65,7 +115,6 @@ fn update_camera(program_data: &mut ProgramData, dt: f32) {
 	);
 	camera_data.rot_xz += mouse_dt.0;
 	camera_data.rot_y = (camera_data.rot_y - mouse_dt.1).clamp(-std::f32::consts::FRAC_PI_2 * 0.999, std::f32::consts::FRAC_PI_2 * 0.999);
-	
 	
 }
 

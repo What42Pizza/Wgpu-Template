@@ -15,6 +15,7 @@ pub struct ProgramData<'a> {
 	pub shadow_caster_data: ShadowCasterData,
 	pub example_model_instances_data: Vec<InstanceData>,
 	pub fps_counter: FpsCounter,
+	pub is_moving_camera: bool,
 	
 	// render data
 	pub render_context: RenderContextData<'a>,
@@ -52,11 +53,13 @@ pub struct EngineConfig {
 
 
 pub struct EngineInput {
+	pub window_is_focused: bool,
 	pub pressed_keys: HashSet<KeyCode>,
 	pub prev_pressed_keys: HashSet<KeyCode>,
-	pub is_focused: bool,
 	pub mouse_pos: PhysicalPosition<f64>,
 	pub prev_mouse_pos: PhysicalPosition<f64>,
+	pub pressed_mouse_buttons: PressedMouseButtons,
+	pub prev_pressed_mouse_buttons: PressedMouseButtons,
 }
 
 impl EngineInput {
@@ -66,6 +69,28 @@ impl EngineInput {
 	pub fn key_just_pressed(&self, key: KeyCode) -> bool {
 		self.pressed_keys.contains(&key) && !self.prev_pressed_keys.contains(&key)
 	}
+	pub fn button_just_pressed(&self, button: MouseButton) -> bool {
+		match button {
+			MouseButton::Left    => self.pressed_mouse_buttons.left_is_down    && !self.prev_pressed_mouse_buttons.left_is_down,
+			MouseButton::Right   => self.pressed_mouse_buttons.right_is_down   && !self.prev_pressed_mouse_buttons.right_is_down,
+			MouseButton::Middle  => self.pressed_mouse_buttons.middle_is_down  && !self.prev_pressed_mouse_buttons.middle_is_down,
+			MouseButton::Back    => self.pressed_mouse_buttons.back_is_down    && !self.prev_pressed_mouse_buttons.back_is_down,
+			MouseButton::Forward => self.pressed_mouse_buttons.forward_is_down && !self.prev_pressed_mouse_buttons.forward_is_down,
+			MouseButton::Other (id) => self.pressed_mouse_buttons.others_down.contains(&id) && !self.prev_pressed_mouse_buttons.others_down.contains(&id),
+		}
+	}
+}
+
+
+
+#[derive(Default, Clone)]
+pub struct PressedMouseButtons {
+	pub left_is_down: bool,
+	pub right_is_down: bool,
+	pub middle_is_down: bool,
+	pub back_is_down: bool,
+	pub forward_is_down: bool,
+	pub others_down: HashSet<u16>,
 }
 
 

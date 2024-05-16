@@ -48,7 +48,7 @@ use std::{env, thread};
 use winit::{
 	application::ApplicationHandler,
 	dpi::PhysicalSize,
-	event::{KeyEvent, WindowEvent},
+	event::{ElementState, KeyEvent, MouseButton, WindowEvent},
 	event_loop::{ActiveEventLoop, EventLoop},
 	keyboard::PhysicalKey,
 	platform::pump_events::EventLoopExtPumpEvents,
@@ -70,7 +70,9 @@ fn main() -> Result<()> {
 	/// struct in order to start the event loop, and C: we need to start the event loop to
 	/// create a window. So, we use EventLoopExtPumpEvents::pump_app_events to run the
 	/// event loop until we can get a window, then use that to create the application
-	/// struct, then use that to start the event loop
+	/// struct, then use that to start the event loop. Although, I've heard that you can
+	/// also store the window in an Option<Arc<>>, which allows you to store both the
+	/// window and render context is the main state struct
 	info!("Running initialization event_loop...");
 	let mut event_loop = EventLoop::new().context("Failed to create event loop.")?;
 	let mut init_data = InitData::default();
@@ -80,6 +82,9 @@ fn main() -> Result<()> {
 			break window;
 		}
 	};
+	
+	window.focus_window();
+	window.set_cursor_visible(false);
 	
 	info!("Done, starting main event_loop...");
 	let mut program_data = load::load_program_data(start_time, &window)?;
@@ -168,7 +173,7 @@ impl<'a> ApplicationHandler for ProgramData<'a> {
 			}
 			
 			WindowEvent::Focused (is_focused) => {
-				program_data.input.is_focused = is_focused;
+				program_data.input.window_is_focused = is_focused;
 			}
 			
 			WindowEvent::KeyboardInput {
@@ -188,6 +193,24 @@ impl<'a> ApplicationHandler for ProgramData<'a> {
 			
 			WindowEvent::CursorMoved {device_id: _, position} => {
 				program_data.input.mouse_pos = position;
+			}
+			
+			WindowEvent::MouseInput {device_id: _, state, button} => {
+				let mouse_buttons = &mut program_data.input.pressed_mouse_buttons;
+				match button {
+					MouseButton::Left    => mouse_buttons.left_is_down    = state.is_pressed(),
+					MouseButton::Right   => mouse_buttons.right_is_down   = state.is_pressed(),
+					MouseButton::Middle  => mouse_buttons.middle_is_down  = state.is_pressed(),
+					MouseButton::Back    => mouse_buttons.back_is_down    = state.is_pressed(),
+					MouseButton::Forward => mouse_buttons.forward_is_down = state.is_pressed(),
+					MouseButton::Other (id) => {
+						if state.is_pressed() {
+							mouse_buttons.others_down.insert(id);
+						} else {
+							mouse_buttons.others_down.remove(&id);
+						}
+					},
+				}
 			}
 			
 			_ => (),
@@ -283,6 +306,7 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 		let input = &mut program_data.input;
 		input.prev_mouse_pos = input.mouse_pos;
 		input.prev_pressed_keys.clone_from(&input.pressed_keys);
+		input.prev_pressed_mouse_buttons = input.pressed_mouse_buttons.clone();
 		
 		
 	}

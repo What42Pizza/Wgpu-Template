@@ -22,9 +22,11 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 	let input = EngineInput {
 		pressed_keys: HashSet::new(),
 		prev_pressed_keys: HashSet::new(),
-		is_focused: true,
+		window_is_focused: true,
 		mouse_pos: PhysicalPosition::new(0.0, 0.0),
 		prev_mouse_pos: PhysicalPosition::new(0.0, 0.0),
+		pressed_mouse_buttons: PressedMouseButtons::default(),
+		prev_pressed_mouse_buttons: PressedMouseButtons::default(),
 	};
 	
 	// app data
@@ -51,6 +53,7 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 		shadow_caster_data,
 		example_model_instances_data,
 		fps_counter,
+		is_moving_camera: true,
 		
 		// render data
 		render_context,
@@ -66,6 +69,14 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 
 
 
+/// to automatically update old config files from version 1 to version 2 (if / when
+/// a version 2 is made), then 2 to 3, and so on, you just add updater functions to
+/// this list
+const CONFIG_UPDATER_FUNCTIONS: &[fn(&mut Map<String, Value>) -> Result<()>] = &[
+	
+];
+const LATEST_CONFIG_VERSION: usize = CONFIG_UPDATER_FUNCTIONS.len() + 1;
+
 pub fn load_engine_config() -> Result<EngineConfig> {
 	
 	let engine_config_path = utils::get_program_file_path("engine config.hjson");
@@ -77,7 +88,13 @@ pub fn load_engine_config() -> Result<EngineConfig> {
 			include_str!("../../data/default engine config.hjson")
 		}
 	};
-	let engine_config: Map<String, Value> = serde_hjson::from_str(engine_config_string).context("Failed to decode 'engine config.hjson'")?;
+	let mut engine_config: Map<String, Value> = serde_hjson::from_str(engine_config_string).context("Failed to decode 'engine config.hjson'")?;
+	
+	// update config
+	let config_version = read_hjson_i64(&engine_config, "config_version", LATEST_CONFIG_VERSION as i64);
+	for i in config_version as usize .. LATEST_CONFIG_VERSION {
+		CONFIG_UPDATER_FUNCTIONS[i - 1](&mut engine_config)?;
+	}
 	
 	let rendering_backend_str = read_hjson_str(&engine_config, "rendering_backend", "auto");
 	let rendering_backend = match &*rendering_backend_str.to_lowercase() {

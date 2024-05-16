@@ -1,4 +1,5 @@
 {
+	config_version: 1
 	rendering_backend: auto
 	present_mode: auto_vsync
 	desired_frame_latency: 1

@@ -1,4 +1,3 @@
-shadows
 basic culling
 post-processing
 	color correction
