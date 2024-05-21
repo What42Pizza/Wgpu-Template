@@ -60,7 +60,7 @@ pub fn get_frustum_planes(camera: &CameraData, aspect_ratio: f32) -> [(glam::Vec
 	let up_dir = glam::Vec3::Y;
 	let right_dir = forward.cross(up_dir).normalize();
 	let up_dir = forward.cross(-right_dir).normalize();
-	const FOV_MULT: f32 = 0.9; // lower this to see the culling work
+	const FOV_MULT: f32 = 1.0; // lower this to see the culling work
 	let half_height = (camera.fov_radians * FOV_MULT / 2.0).tan() * camera.near;
 	let half_width = half_height * aspect_ratio;
 	let near_plane_center = camera.pos + forward * camera.near;
