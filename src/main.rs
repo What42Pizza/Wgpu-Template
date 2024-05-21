@@ -1,5 +1,5 @@
 // Started:      24/04/18
-// Last updated: 24/05/12
+// Last updated: 24/05/20
 
 // Learn Wgpu website: https://sotrh.github.io/learn-wgpu/
 // Learn Wgpu repo: https://github.com/sotrh/learn-wgpu
@@ -48,7 +48,7 @@ use std::{env, thread};
 use winit::{
 	application::ApplicationHandler,
 	dpi::PhysicalSize,
-	event::{ElementState, KeyEvent, MouseButton, WindowEvent},
+	event::{KeyEvent, MouseButton, WindowEvent},
 	event_loop::{ActiveEventLoop, EventLoop},
 	keyboard::PhysicalKey,
 	platform::pump_events::EventLoopExtPumpEvents,
@@ -65,14 +65,14 @@ fn main() -> Result<()> {
 	}
 	env_logger::init();
 	
-	/// With Winit 0.30.0, there's kinda a catch-22 here where A: we need the window to be
-	/// available before we create the application struct, B: we need the application
-	/// struct in order to start the event loop, and C: we need to start the event loop to
-	/// create a window. So, we use EventLoopExtPumpEvents::pump_app_events to run the
-	/// event loop until we can get a window, then use that to create the application
-	/// struct, then use that to start the event loop. Although, I've heard that you can
-	/// also store the window in an Option<Arc<>>, which allows you to store both the
-	/// window and render context is the main state struct
+	// HELP: With Winit 0.30.0, there's kinda a catch-22 here where A: we need the window
+	// to be available before we create the application struct, B: we need the
+	// application struct in order to start the event loop, and C: we need to start the
+	// event loop to create a window. So, we use EventLoopExtPumpEvents::pump_app_events
+	// to run the event loop until we can get a window, then use that to create the
+	// application struct, then use that to start the event loop. Although, I've heard
+	// that you can also store the window in an Option<Arc<>>, which allows you to store
+	// both the window and render context is the main state struct
 	info!("Running initialization event_loop...");
 	let mut event_loop = EventLoop::new().context("Failed to create event loop.")?;
 	let mut init_data = InitData::default();
@@ -97,7 +97,7 @@ fn main() -> Result<()> {
 
 
 
-/// the entire purpose of this part is to get a usable window
+// HELP: the entire purpose of this part is to get a usable window
 
 #[derive(Default)]
 pub struct InitData {

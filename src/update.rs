@@ -21,8 +21,6 @@ pub fn update(program_data: &mut ProgramData, dt: f32) -> Result<ShouldExit> {
 		update_camera(program_data, dt);
 	}
 	
-	update_gpu_buffers(program_data);
-	
 	let should_exit = process_post_frame_inputs(program_data);
 	if should_exit {return Ok(true);}
 	
@@ -115,25 +113,5 @@ fn update_camera(program_data: &mut ProgramData, dt: f32) {
 	);
 	camera_data.rot_xz += mouse_dt.0;
 	camera_data.rot_y = (camera_data.rot_y - mouse_dt.1).clamp(-std::f32::consts::FRAC_PI_2 * 0.999, std::f32::consts::FRAC_PI_2 * 0.999);
-	
-}
-
-
-
-pub fn update_gpu_buffers(program_data: &mut ProgramData) {
-	
-	let camera_gpu_data = program_data.camera_data.build_gpu_data(program_data.render_context.aspect_ratio);
-	program_data.render_context.command_queue.write_buffer(
-		&program_data.render_assets.camera.buffer,
-		0,
-		bytemuck::cast_slice(&camera_gpu_data),
-	);
-	
-	let shadow_caster_gpu_data = program_data.shadow_caster_data.build_gpu_data(program_data.camera_data.pos);
-	program_data.render_context.command_queue.write_buffer(
-		&program_data.render_assets.shadow_caster.proj_mat_buffer,
-		0,
-		bytemuck::cast_slice(&shadow_caster_gpu_data),
-	);
 	
 }

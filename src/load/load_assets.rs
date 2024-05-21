@@ -7,7 +7,7 @@ use wgpu::util::DeviceExt;
 pub fn load_render_assets(
 	camera_data: &CameraData,
 	shadow_caster_data: &ShadowCasterData,
-	example_model_instances_data: &[InstanceData],
+	example_model_instance_datas: &[InstanceData],
 	render_context: &RenderContextData,
 	shadowmap_size: u32,
 ) -> Result<RenderAssets> {
@@ -30,7 +30,7 @@ pub fn load_render_assets(
 	let shadow_caster = load_shadow_caster_data(render_context, shadowmap_size, shadow_caster_data, camera_data).context("Failed to load shadow caster render data.")?;
 	
 	// models render data
-	let example_models = load_example_models_render_data(render_context, &mut materials_storage, example_model_instances_data).context("Failed to load model render data.")?;
+	let example_models = load_example_models_render_data(render_context, &mut materials_storage, example_model_instance_datas).context("Failed to load model render data.")?;
 	
 	// skybox render data
 	let skybox_material_id = load_skybox_material(render_context, &mut materials_storage).context("Failed to load skybox render data.")?;
@@ -166,23 +166,33 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 pub fn load_example_models_render_data(
 	render_context: &RenderContextData,
 	materials_storage: &mut MaterialsStorage,
-	instances_data: &[InstanceData],
+	instance_datas: &[InstanceData],
 ) -> Result<ModelsRenderData> {
 	
-	let example_model_meshes = load_model(utils::get_program_file_path("assets/cube.obj"), render_context, materials_storage)?;
+	let (example_model_meshes, bounding_radius) = load_model(utils::get_program_file_path("assets/cube.obj"), render_context, materials_storage)?;
 	
-	let example_model_instances_data = instances_data.iter().map(InstanceData::to_raw).collect::<Vec<_>>();
-	let instances_buffer = render_context.device.create_buffer_init(
+	let example_model_instance_datas = instance_datas.iter().map(InstanceData::to_raw).collect::<Vec<_>>();
+	let culled_instances_buffer = render_context.device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
 			label: Some("example_models_instances_buffer"),
-			contents: bytemuck::cast_slice(&example_model_instances_data),
-			usage: wgpu::BufferUsages::VERTEX,
+			contents: bytemuck::cast_slice(&example_model_instance_datas),
+			usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+		}
+	);
+	let total_instances_buffer = render_context.device.create_buffer_init(
+		&wgpu::util::BufferInitDescriptor {
+			label: Some("example_models_instances_buffer"),
+			contents: bytemuck::cast_slice(&example_model_instance_datas),
+			usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
 		}
 	);
 	
 	Ok(ModelsRenderData {
-		instances_buffer,
-		instances_count: instances_data.len() as u32,
+		culled_instances_buffer,
+		culled_instances_count: example_model_instance_datas.len() as u32,
+		total_instances_buffer,
+		total_instances_count: example_model_instance_datas.len() as u32,
+		bounding_radius,
 		meshes: example_model_meshes,
 	})
 }
@@ -193,7 +203,7 @@ pub fn load_model(
 	file_path: impl AsRef<Path>,
 	render_context: &RenderContextData,
 	materials_storage: &mut MaterialsStorage,
-) -> Result<Vec<MeshRenderData>> {
+) -> Result<(Vec<MeshRenderData>, f32)> {
 	let file_path = file_path.as_ref();
 	let obj_text = fs::read_to_string(file_path).add_path_to_error(file_path)?;
 	let obj_cursor = Cursor::new(obj_text);
@@ -232,6 +242,7 @@ pub fn load_model(
 		material_ids.push(material_id);
 	}
 	
+	let mut bounding_radius = 0.0f32;
 	let meshes = models
 		.into_iter()
 		.map(|model| {
@@ -239,11 +250,17 @@ pub fn load_model(
 			let mut basic_vertices = Vec::with_capacity(pos_count);
 			let mut extended_vertices = Vec::with_capacity(pos_count);
 			for i in 0..pos_count {
+				let pos = (
+					model.mesh.positions[i * 3],
+					model.mesh.positions[i * 3 + 1],
+					model.mesh.positions[i * 3 + 2],
+				);
+				bounding_radius = bounding_radius.max((pos.0 * pos.0 + pos.1 * pos.1 + pos.2 * pos.2).sqrt());
 				basic_vertices.push(BasicVertexData {
-					position: [
-						model.mesh.positions[i * 3],
-						model.mesh.positions[i * 3 + 1],
-						model.mesh.positions[i * 3 + 2],
+					pos: [
+						pos.0,
+						pos.1,
+						pos.2,
 					],
 				});
 				extended_vertices.push(ExtendedVertexData {
@@ -284,7 +301,7 @@ pub fn load_model(
 		})
 		.collect::<Vec<_>>();
 	
-	Ok(meshes)
+	Ok((meshes, bounding_radius))
 }
 
 

@@ -32,13 +32,13 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 	// app data
 	let camera_data = CameraData::new((0., 1., 2.));
 	let shadow_caster_data = ShadowCasterData::default();
-	let example_model_instances_data = load_example_model_instances_data();
+	let example_model_instance_datas = load_example_model_instance_datas();
 	let fps_counter = FpsCounter::new();
 	
 	// render data
 	let render_context = load_render_context_data(window, &engine_config)?;
 	let render_layouts = load_render_layouts(&render_context)?;
-	let render_assets = load_render_assets(&camera_data, &shadow_caster_data, &example_model_instances_data, &render_context, engine_config.shadowmap_size)?;
+	let render_assets = load_render_assets(&camera_data, &shadow_caster_data, &example_model_instance_datas, &render_context, engine_config.shadowmap_size)?;
 	let render_bindings = load_render_bindings(&render_context, &render_layouts, &render_assets)?;
 	
 	Ok(ProgramData {
@@ -51,7 +51,7 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 		// app data
 		camera_data,
 		shadow_caster_data,
-		example_model_instances_data,
+		example_model_instance_datas,
 		fps_counter,
 		is_moving_camera: true,
 		
@@ -69,9 +69,10 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 
 
 
-/// to automatically update old config files from version 1 to version 2 (if / when
-/// a version 2 is made), then 2 to 3, and so on, you just add updater functions to
-/// this list
+// HELP: to automatically update old config files from version 1 to version 2 (if / when
+// a version 2 is made), then 2 to 3, and so on, you just add updater functions to this
+// list
+#[allow(clippy::type_complexity)]
 const CONFIG_UPDATER_FUNCTIONS: &[fn(&mut Map<String, Value>) -> Result<()>] = &[
 	
 ];
@@ -183,28 +184,28 @@ pub fn read_hjson_f64(map: &Map<String, Value>, key: &'static str, default: f64)
 
 
 
-/// this is just random data as an example
-pub fn load_example_model_instances_data() -> Vec<InstanceData> {
+// HELP: this is just random data as an example
+pub fn load_example_model_instance_datas() -> Vec<InstanceData> {
 	const X_LEN: usize = 100;
 	const Z_LEN: usize = 100;
 	let mut output = Vec::with_capacity(X_LEN * Z_LEN);
 	for z in 0..Z_LEN {
 		for x in 0..X_LEN {
-			let position = glam::Vec3 { x: x as f32 * 3.0, y: 0.0, z: z as f32 * 3.0 } - glam::Vec3::new(0.5, 0.0, 0.5);
-			let rotation = glam::Quat::from_euler(glam::EulerRot::XYZ, position.x / 10.0, position.y / 10.0, position.z / 10.0);
+			let pos = glam::Vec3 { x: x as f32 * 3.0, y: 0.0, z: z as f32 * 3.0 } - glam::Vec3::new(0.5, 0.0, 0.5);
+			let rot = glam::Quat::from_euler(glam::EulerRot::XYZ, pos.x / 10.0, pos.y / 10.0, pos.z / 10.0);
 			output.push(InstanceData {
-				position,
-				rotation,
+				pos,
+				rot,
 			})
 		}
 	}
 	for z in 0..Z_LEN {
 		for x in 0..X_LEN {
-			let position = glam::Vec3 { x: x as f32 * 3.0, y: 10.0, z: z as f32 * 3.0 } - glam::Vec3::new(0.5, 0.0, 0.5);
-			let rotation = glam::Quat::from_euler(glam::EulerRot::XYZ, position.x / 10.0, position.y / 10.0, position.z / 10.0);
+			let pos = glam::Vec3 { x: x as f32 * 3.0, y: 10.0, z: z as f32 * 3.0 } - glam::Vec3::new(0.5, 0.0, 0.5);
+			let rot = glam::Quat::from_euler(glam::EulerRot::XYZ, pos.x / 10.0, pos.y / 10.0, pos.z / 10.0);
 			output.push(InstanceData {
-				position,
-				rotation,
+				pos,
+				rot,
 			})
 		}
 	}

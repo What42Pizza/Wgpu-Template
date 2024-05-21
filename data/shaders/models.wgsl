@@ -11,7 +11,7 @@ struct CameraData {
 }
 
 struct BasicVertexInput {
-	@location(0) position: vec3f,
+	@location(0) pos: vec3f,
 }
 
 struct ExtendedVertexInput {
@@ -42,11 +42,10 @@ fn vs_main(
 		instance.model_mat_3,
 	);
 	
-	var world_pos = instance_mat * vec4(vertex_basic.position, 1.0);
+	var world_pos = instance_mat * vec4(vertex_basic.pos, 1.0);
 	
 	var out: VertexOutput;
 	out.screen_pos = camera_data.proj_view_mat * world_pos;
-	out.screen_pos.z = out.screen_pos.z * 0.5 + 0.5;
 	out.world_pos = world_pos.xyz;
 	out.texcoords = vertex_extended.texcoords;
 	return out;

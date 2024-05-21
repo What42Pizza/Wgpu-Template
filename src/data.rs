@@ -13,15 +13,16 @@ pub struct ProgramData<'a> {
 	// app data
 	pub camera_data: CameraData,
 	pub shadow_caster_data: ShadowCasterData,
-	pub example_model_instances_data: Vec<InstanceData>,
+	pub example_model_instance_datas: Vec<InstanceData>,
 	pub fps_counter: FpsCounter,
 	pub is_moving_camera: bool,
 	
 	// render data
 	pub render_context: RenderContextData<'a>,
-	/// There are (currently) three render 'modules', shadow_caster, models, and skybox.
-	/// The layouts for all three are created, then the assets (buffers and tex views) for
-	/// all three are created, then the bindings to the assets for all three are created.
+	// HELP: There are (currently) three render 'modules': shadow_caster, models, and
+	// skybox. The layouts for all three are created, then the assets (buffers, tex
+	// views, etc) for all three are created, then the bindings to the assets for all
+	// three are created.
 	pub render_layouts: RenderLayouts,
 	pub render_assets: RenderAssets,
 	pub render_bindings: RenderBindings,
@@ -101,17 +102,17 @@ pub struct CameraData {
 	pub pos: glam::Vec3,
 	pub rot_xz: f32,
 	pub rot_y: f32,
-	pub fov: f32,
+	pub fov_radians: f32,
 	pub near: f32,
 	pub far: f32,
 }
 
 impl CameraData {
-	/// Ideally you should use some sort of processing cpu-side that accounts for the fact
-	/// that `glam` (and similar crates) expect a z-range of -1 to 1 while wgpu expects a
-	/// z-range of 0 to 1, but I haven't been able to integrate this matrix with the
-	/// skybox code, and I've found that it's easier to just correct the z-range at the
-	/// end of the vertex shaders (`pos.z = pos.z * 0.5 + 0.5`)
+	// HELP: Ideally you should use some sort of processing cpu-side that accounts for
+	// the fact that `glam` (and similar crates) expect a z-range of -1 to 1 while wgpu
+	// expects a z-range of 0 to 1, but I haven't been able to integrate this matrix with
+	// the skybox code, and I've found that it's easier to just correct the z-range at
+	// the end of the vertex shaders (`pos.z = pos.z * 0.5 + 0.5`)
 	pub const OPENGL_TO_WGPU_MATRIX: glam::Mat4 = glam::Mat4::from_cols_array(&[
 		1.0, 0.0, 0.0, 0.0,
 		0.0, 1.0, 0.0, 0.0,
@@ -119,8 +120,7 @@ impl CameraData {
 		0.0, 0.0, 0.0, 1.0,
 	]);
 	pub fn build_gpu_data(&self, aspect_ratio: f32) -> [f32; 16 + 16 + 16] {
-		//println!("{} {}", self.rot_xz, self.rot_y);
-		let proj = glam::Mat4::perspective_rh(self.fov, aspect_ratio, 1.0, 50.0);
+		let proj = glam::Mat4::perspective_rh(self.fov_radians, aspect_ratio, self.near, self.far);
 		let target = self.pos + glam::Vec3::new(
 			self.rot_xz.cos() * self.rot_y.cos(),
 			self.rot_y.sin(),
@@ -140,9 +140,9 @@ impl CameraData {
 			pos: pos.into(),
 			rot_xz: 0.0,
 			rot_y: 0.0,
-			fov: 70.0,
+			fov_radians: 70.0f32.to_radians(),
 			near: 0.1,
-			far: 100.0,
+			far: 500.0,
 		}
 	}
 }
@@ -156,13 +156,10 @@ pub struct ShadowCasterData {
 
 impl ShadowCasterData {
 	pub fn build_gpu_data(&self, center_pos: glam::Vec3) -> [f32; 16] {
-		//let center_pos = glam::Vec3::new(150.0, 50.0, 150.0);
 		let trans_mat = glam::Mat4::from_translation(-center_pos);
 		let rot_mat = glam::Mat4::from_quat(self.rot);
 		let scale_mat = glam::Mat4::from_scale(1.0 / self.size);
 		let output = scale_mat * rot_mat * trans_mat;
-		//let output = glam::Mat4::from_scale_rotation_translation(self.size, self.rot, center_pos);
-		//println!("{:?}", output.transform_point3(glam::Vec3::new(10.0, 10.0, 10.0)));
 		output.to_cols_array()
 	}
 }
@@ -286,17 +283,19 @@ impl MaterialsStorage {
 pub type MaterialId = usize;
 
 pub struct MaterialRenderData {
-	/// `path` is used to make sure the same data isn't loaded multiple times
+	// `path` is used to make sure the same data isn't loaded multiple times
 	pub path: PathBuf,
 	pub view: wgpu::TextureView,
 }
 
 pub struct ModelsRenderData {
-	/// defines the data per model
-	pub instances_buffer: wgpu::Buffer,
-	pub instances_count: u32,
-	/// defines the data for a single model
-	pub meshes: Vec<MeshRenderData>,
+	// defines the data per model
+	pub culled_instances_buffer: wgpu::Buffer,
+	pub culled_instances_count: u32,
+	pub total_instances_buffer: wgpu::Buffer,
+	pub total_instances_count: u32,
+	pub bounding_radius: f32,
+	pub meshes: Vec<MeshRenderData>, // defines the data for a single model
 }
 
 pub struct MeshRenderData {
@@ -307,9 +306,9 @@ pub struct MeshRenderData {
 	pub material_id: MaterialId,
 }
 
-/// Many structs like this only have whatever data is actually used, if you run into a
-/// situation where you also need the Texture, Sampler, etc then you can just add them to
-/// the relevant struct
+// HELP: Many structs like this only have whatever data is actually used, if you run into
+// a situation where you also need the Texture, Sampler, etc then you can just add them
+// to the relevant struct
 pub struct DepthRenderData {
 	pub view: wgpu::TextureView,
 }
@@ -320,10 +319,10 @@ pub struct ShadowCasterRenderData {
 	pub proj_mat_buffer: wgpu::Buffer,
 }
 
-/// It may be a bit disorienting to have two Camera structs, but just keep this is mind:
-/// the struct `CameraData` holds the data used for app logic, the struct
-/// `CameraRenderData` holds the data for rendering logic, and data is moved from `Camera`
-/// to `CameraRenderData` each frame (or whenever needed)
+// HELP: It may be a bit disorienting to have two Camera structs, but just keep this is
+// mind: the struct `CameraData` holds the data used for app logic, the struct
+// `CameraRenderData` holds the data for rendering logic, and data is moved from `Camera`
+// to `CameraRenderData` each frame (or whenever needed)
 pub struct CameraRenderData {
 	pub buffer: wgpu::Buffer,
 }
@@ -349,7 +348,7 @@ pub struct RenderBindings {
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct BasicVertexData {
-	pub position: [f32; 3],
+	pub pos: [f32; 3],
 }
 
 impl BasicVertexData {
@@ -367,7 +366,7 @@ impl BasicVertexData {
 
 
 
-/// NOTE: 'extended' here means more advanced, having more data
+// NOTE: 'extended' here means more advanced, having more data
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct ExtendedVertexData {
@@ -392,13 +391,13 @@ impl ExtendedVertexData {
 
 
 pub struct InstanceData {
-	pub position: glam::Vec3,
-	pub rotation: glam::Quat,
+	pub pos: glam::Vec3,
+	pub rot: glam::Quat,
 }
 
 impl InstanceData {
 	pub fn to_raw(&self) -> RawInstanceData {
-		let model_data = glam::Mat4::from_translation(self.position) * glam::Mat4::from_quat(self.rotation);
+		let model_data = glam::Mat4::from_translation(self.pos) * glam::Mat4::from_quat(self.rot);
 		RawInstanceData {
 			model: model_data.to_cols_array_2d(),
 		}

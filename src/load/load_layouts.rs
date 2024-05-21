@@ -85,7 +85,6 @@ pub fn load_shadow_caster_layouts(render_context: &RenderContextData) -> Result<
 			entry_point: "vs_main",
 			buffers: &[
 				BasicVertexData::get_layout(),
-				ExtendedVertexData::get_layout(),
 				RawInstanceData::get_layout()
 			],
 			compilation_options: wgpu::PipelineCompilationOptions::default(),
@@ -106,7 +105,7 @@ pub fn load_shadow_caster_layouts(render_context: &RenderContextData) -> Result<
 			depth_compare: wgpu::CompareFunction::LessEqual,
 			stencil: wgpu::StencilState::default(),
 			bias: wgpu::DepthBiasState {
-				constant: 2, /// corresponds to bilinear filtering
+				constant: 2, // HELP: corresponds to bilinear filtering
 				slope_scale: 2.0,
 				clamp: 0.0,
 			},

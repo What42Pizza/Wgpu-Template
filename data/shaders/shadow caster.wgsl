@@ -1,12 +1,7 @@
 @group(0) @binding(0) var<uniform> proj_mat: mat4x4f;
 
 struct BasicVertexInput {
-	@location(0) position: vec3f,
-}
-
-struct ExtendedVertexInput {
-	@location(1) texcoords: vec2f,
-	@location(2) normal: vec2f,
+	@location(0) pos: vec3f,
 }
 
 struct InstanceInput {
@@ -21,7 +16,6 @@ struct InstanceInput {
 @vertex
 fn vs_main(
 	vertex_basic: BasicVertexInput,
-	vertex_extended: ExtendedVertexInput,
 	instance: InstanceInput,
 ) -> @builtin(position) vec4f {
 	
@@ -32,7 +26,7 @@ fn vs_main(
 		instance.model_mat_3,
 	);
 	
-	var out = proj_mat * instance_mat * vec4(vertex_basic.position, 1.0);
+	var out = proj_mat * instance_mat * vec4(vertex_basic.pos, 1.0);
 	out.z = out.z * 0.5 + 0.5;
 	return out;
 }

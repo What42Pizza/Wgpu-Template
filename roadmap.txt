@@ -1,4 +1,3 @@
-basic culling
 post-processing
 	color correction
 	bloom
