@@ -3,9 +3,6 @@ use crate::prelude::*;
 
 
 pub fn render(output: &wgpu::SurfaceTexture, program_data: &mut ProgramData) {
-	let output_view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
-	let encoder_descriptor = wgpu::CommandEncoderDescriptor {label: None};
-	let mut encoder = program_data.render_context.device.create_command_encoder(&encoder_descriptor);
 	
 	let frustum_planes = get_frustum_planes(&program_data.camera_data, program_data.render_context.aspect_ratio);
 	let visible_models_list = get_visible_models(
@@ -16,9 +13,15 @@ pub fn render(output: &wgpu::SurfaceTexture, program_data: &mut ProgramData) {
 	
 	update_gpu_buffers(program_data, &visible_models_list);
 	
+	let output_view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+	let main_tex_view = &program_data.render_assets.main_tex_view;
+	let encoder_descriptor = wgpu::CommandEncoderDescriptor {label: None};
+	let mut encoder = program_data.render_context.device.create_command_encoder(&encoder_descriptor);
+	
 	render_shadow_caster_pipeline(program_data, &mut encoder);
-	render_models_pipeline(program_data, &mut encoder, &output_view);
-	render_skybox_pipeline(program_data, &mut encoder, &output_view); // HELP: it's better to have this at the end so that only the necessary pixels are rendered
+	render_models_pipeline(program_data, &mut encoder, &main_tex_view);
+	render_skybox_pipeline(program_data, &mut encoder, &main_tex_view); // HELP: it's better to have this at the end so that only the necessary pixels are rendered
+	render_color_correction_pipeline(program_data, &mut encoder, &output_view);
 	
 	program_data.render_context.command_queue.submit(std::iter::once(encoder.finish()));
 }
@@ -181,13 +184,13 @@ pub fn render_shadow_caster_pipeline(program_data: &ProgramData, encoder: &mut w
 
 
 
-pub fn render_models_pipeline(program_data: &ProgramData, encoder: &mut wgpu::CommandEncoder, output_view: &wgpu::TextureView) {
+pub fn render_models_pipeline(program_data: &ProgramData, encoder: &mut wgpu::CommandEncoder, main_tex_view: &wgpu::TextureView) {
 	let render_assets = &program_data.render_assets;
 	
 	let mut models_pass_handle = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
 		label: Some("models_render_pass"),
 		color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-			view: output_view,
+			view: main_tex_view,
 			resolve_target: None,
 			ops: wgpu::Operations {
 				load: wgpu::LoadOp::Clear (wgpu::Color {
@@ -229,13 +232,13 @@ pub fn render_models_pipeline(program_data: &ProgramData, encoder: &mut wgpu::Co
 
 
 
-pub fn render_skybox_pipeline(program_data: &ProgramData, encoder: &mut wgpu::CommandEncoder, output_view: &wgpu::TextureView) {
+pub fn render_skybox_pipeline(program_data: &ProgramData, encoder: &mut wgpu::CommandEncoder, main_tex_view: &wgpu::TextureView) {
 	let render_assets = &program_data.render_assets;
 	
 	let mut skybox_pass_handle = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
 		label: Some("skybox_render_pass"),
 		color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-			view: output_view,
+			view: main_tex_view,
 			resolve_target: None,
 			ops: wgpu::Operations {
 				load: wgpu::LoadOp::Load,
@@ -256,6 +259,35 @@ pub fn render_skybox_pipeline(program_data: &ProgramData, encoder: &mut wgpu::Co
 	
 	skybox_pass_handle.set_pipeline(&program_data.render_layouts.skybox_pipeline);
 	skybox_pass_handle.set_bind_group(0, &program_data.render_bindings.skybox_bind_0, &[]);
+	
+	skybox_pass_handle.draw(0..3, 0..1)
+	
+}
+
+
+
+
+
+pub fn render_color_correction_pipeline(program_data: &ProgramData, encoder: &mut wgpu::CommandEncoder, output_view: &wgpu::TextureView) {
+	let render_assets = &program_data.render_assets;
+	
+	let mut skybox_pass_handle = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+		label: Some("color_correction_render_pass"),
+		color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+			view: output_view,
+			resolve_target: None,
+			ops: wgpu::Operations {
+				load: wgpu::LoadOp::Load,
+				store: wgpu::StoreOp::Store,
+			},
+		})],
+		depth_stencil_attachment: None,
+		occlusion_query_set: None,
+		timestamp_writes: None,
+	});
+	
+	skybox_pass_handle.set_pipeline(&program_data.render_layouts.color_correction_pipeline);
+	skybox_pass_handle.set_bind_group(0, &program_data.render_bindings.color_correction_bind_0, &[]);
 	
 	skybox_pass_handle.draw(0..3, 0..1)
 	

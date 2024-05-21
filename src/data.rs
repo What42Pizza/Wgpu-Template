@@ -16,6 +16,7 @@ pub struct ProgramData<'a> {
 	pub example_model_instance_datas: Vec<InstanceData>,
 	pub fps_counter: FpsCounter,
 	pub is_moving_camera: bool,
+	pub color_correction_settings: ColorCorrectionSettings,
 	
 	// render data
 	pub render_context: RenderContextData<'a>,
@@ -212,6 +213,24 @@ impl FpsCounter {
 
 
 
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct ColorCorrectionSettings {
+	pub saturation: f32,
+	pub brightness: f32,
+}
+
+impl Default for ColorCorrectionSettings {
+	fn default() -> Self {
+		Self {
+			saturation: 1.1,
+			brightness: 1.1,
+		}
+	}
+}
+
+
+
 
 
 pub struct RenderContextData<'a> {
@@ -221,6 +240,7 @@ pub struct RenderContextData<'a> {
 	pub command_queue: wgpu::Queue,
 	pub surface_config: wgpu::SurfaceConfiguration,
 	pub surface_size: winit::dpi::PhysicalSize<u32>,
+	pub surface_format: wgpu::TextureFormat,
 	pub aspect_ratio: f32,
 }
 
@@ -241,6 +261,10 @@ pub struct RenderLayouts {
 	pub skybox_pipeline: wgpu::RenderPipeline,
 	pub skybox_bind_0_layout: wgpu::BindGroupLayout,
 	
+	// color correction data
+	pub color_correction_pipeline: wgpu::RenderPipeline,
+	pub color_correction_bind_0_layout: wgpu::BindGroupLayout,
+	
 }
 
 
@@ -250,6 +274,7 @@ pub struct RenderAssets {
 	
 	// general render data
 	pub depth: DepthRenderData,
+	pub main_tex_view: wgpu::TextureView,
 	pub camera: CameraRenderData,
 	pub default_sampler: wgpu::Sampler,
 	pub materials_storage: MaterialsStorage,
@@ -263,6 +288,9 @@ pub struct RenderAssets {
 	// skybox render data
 	pub skybox_material_id: MaterialId,
 	pub skybox_sampler: wgpu::Sampler,
+	
+	// color correction data
+	pub color_correction_buffer: wgpu::Buffer,
 	
 }
 
@@ -340,6 +368,9 @@ pub struct RenderBindings {
 	
 	// skybox render data
 	pub skybox_bind_0: wgpu::BindGroup,
+	
+	// color correction data
+	pub color_correction_bind_0: wgpu::BindGroup,
 	
 }
 

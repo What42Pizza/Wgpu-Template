@@ -34,11 +34,19 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 	let shadow_caster_data = ShadowCasterData::default();
 	let example_model_instance_datas = load_example_model_instance_datas();
 	let fps_counter = FpsCounter::new();
+	let color_correction_settings = ColorCorrectionSettings::default();
 	
 	// render data
 	let render_context = load_render_context_data(window, &engine_config)?;
 	let render_layouts = load_render_layouts(&render_context)?;
-	let render_assets = load_render_assets(&camera_data, &shadow_caster_data, &example_model_instance_datas, &render_context, engine_config.shadowmap_size)?;
+	let render_assets = load_render_assets(
+		&camera_data,
+		&shadow_caster_data,
+		&example_model_instance_datas,
+		&render_context,
+		engine_config.shadowmap_size,
+		&color_correction_settings,
+	)?;
 	let render_bindings = load_render_bindings(&render_context, &render_layouts, &render_assets)?;
 	
 	Ok(ProgramData {
@@ -54,6 +62,7 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 		example_model_instance_datas,
 		fps_counter,
 		is_moving_camera: true,
+		color_correction_settings,
 		
 		// render data
 		render_context,
@@ -221,7 +230,7 @@ pub fn load_render_context_data<'a>(window: &'a Window, engine_config: &load::En
 }
 
 pub async fn load_render_context_data_async<'a>(window: &'a Window, engine_config: &load::EngineConfig) -> Result<RenderContextData<'a>> {
-	let size = window.inner_size();
+	let surface_size = window.inner_size();
 	
 	// The instance is a handle to our GPU
 	// Backends::all => Vulkan + Metal + DX12 + Browser WebGPU
@@ -250,7 +259,7 @@ pub async fn load_render_context_data_async<'a>(window: &'a Window, engine_confi
 	let Some(adapter) = adapter else {return Err(Error::msg("Unable to find suitable adapter."));};
 	
 	// Open connection to a graphics and/or compute device, Handle to a command queue on a device
-	let (device, queue) = adapter.request_device(
+	let (device, command_queue) = adapter.request_device(
 		&wgpu::DeviceDescriptor {
 			required_features: wgpu::Features::empty(),
 			required_limits: wgpu::Limits::downlevel_defaults(),
@@ -264,25 +273,26 @@ pub async fn load_render_context_data_async<'a>(window: &'a Window, engine_confi
 		.copied()
 		.find(|f| f.is_srgb())
 		.unwrap_or(surface_caps.formats[0]);
-	let config = wgpu::SurfaceConfiguration {
+	let surface_config = wgpu::SurfaceConfiguration {
 		usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
 		format: surface_format,
-		width: size.width,
-		height: size.height,
+		width: surface_size.width,
+		height: surface_size.height,
 		present_mode: engine_config.present_mode,
 		alpha_mode: surface_caps.alpha_modes[0],
 		view_formats: vec![],
 		desired_maximum_frame_latency: engine_config.desired_frame_latency,
 	};
-	surface.configure(&device, &config);
+	surface.configure(&device, &surface_config);
 	
 	Ok(RenderContextData {
 		window,
 		drawable_surface: surface,
 		device,
-		command_queue: queue,
-		surface_config: config,
-		surface_size: size,
-		aspect_ratio: size.width as f32 / size.height as f32,
+		command_queue,
+		surface_config,
+		surface_size,
+		surface_format,
+		aspect_ratio: surface_size.width as f32 / surface_size.height as f32,
 	})
 }

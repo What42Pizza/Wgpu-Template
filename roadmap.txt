@@ -1,7 +1,6 @@
 post-processing
-	color correction
 	bloom
-	taa
+	taa?
 gui system?
 text rendering
 texture compression?

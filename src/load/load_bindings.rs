@@ -86,6 +86,27 @@ pub fn load_render_bindings(render_context: &RenderContextData, render_layouts: 
 	
 	
 	
+	let color_correction_bind_0 = render_context.device.create_bind_group(&wgpu::BindGroupDescriptor {
+		label: Some("color_correction_bind_0"),
+		layout: &render_layouts.color_correction_bind_0_layout,
+		entries: &[
+			wgpu::BindGroupEntry {
+				binding: 0,
+				resource: render_assets.color_correction_buffer.as_entire_binding(),
+			},
+			wgpu::BindGroupEntry {
+				binding: 1,
+				resource: wgpu::BindingResource::TextureView (&render_assets.main_tex_view),
+			},
+			wgpu::BindGroupEntry {
+				binding: 2,
+				resource: wgpu::BindingResource::Sampler (&render_assets.default_sampler),
+			},
+		],
+	});
+	
+	
+	
 	Ok(RenderBindings {
 		
 		shadow_caster_bind_0,
@@ -94,6 +115,8 @@ pub fn load_render_bindings(render_context: &RenderContextData, render_layouts: 
 		example_models_bind_1s,
 		
 		skybox_bind_0,
+		
+		color_correction_bind_0,
 		
 	})
 }

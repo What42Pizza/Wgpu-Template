@@ -20,6 +20,11 @@ pub fn load_render_layouts(render_context: &RenderContextData) -> Result<RenderL
 		skybox_bind_0_layout,
 	) = load_skybox_layouts(render_context)?;
 	
+	let (
+		color_correction_pipeline,
+		color_correction_bind_0_layout,
+	) = load_color_correction_layouts(render_context)?;
+	
 	Ok(RenderLayouts {
 		
 		shadow_caster_pipeline,
@@ -30,7 +35,10 @@ pub fn load_render_layouts(render_context: &RenderContextData) -> Result<RenderL
 		models_bind_1_layout,
 		
 		skybox_pipeline,
-		skybox_bind_0_layout
+		skybox_bind_0_layout,
+		
+		color_correction_pipeline,
+		color_correction_bind_0_layout,
 		
 	})
 }
@@ -378,5 +386,107 @@ pub fn load_skybox_layouts(render_context: &RenderContextData) -> Result<(
 	Ok((
 		skybox_pipeline,
 		skybox_bind_0_layout,
+	))
+}
+
+
+
+
+
+pub fn load_color_correction_layouts(render_context: &RenderContextData) -> Result<(
+	wgpu::RenderPipeline,
+	wgpu::BindGroupLayout,
+)> {
+	
+	
+	let shader_path = utils::get_program_file_path("shaders/color correction.wgsl");
+	let shader_source = fs::read_to_string(&shader_path).add_path_to_error(&shader_path)?;
+	let shader = render_context.device.create_shader_module(wgpu::ShaderModuleDescriptor {
+		label: Some("color_correction_shader_module"),
+		source: wgpu::ShaderSource::Wgsl(shader_source.into()),
+	});
+	
+	
+	let color_correction_bind_0_layout = render_context.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+		label: Some("color_correction_bind_0_layout"),
+		entries: &[
+			wgpu::BindGroupLayoutEntry { // color correction: buffer
+				binding: 0,
+				visibility: wgpu::ShaderStages::FRAGMENT,
+				ty: wgpu::BindingType::Buffer {
+					ty: wgpu::BufferBindingType::Uniform,
+					has_dynamic_offset: false,
+					min_binding_size: None,
+				},
+				count: None,
+			},
+			wgpu::BindGroupLayoutEntry { // main_tex: texture
+				binding: 1,
+				visibility: wgpu::ShaderStages::FRAGMENT,
+				ty: wgpu::BindingType::Texture {
+					multisampled: false,
+					view_dimension: wgpu::TextureViewDimension::D2,
+					sample_type: wgpu::TextureSampleType::Float { filterable: true },
+				},
+				count: None,
+			},
+			wgpu::BindGroupLayoutEntry { // main_tex: sampler
+				binding: 2,
+				visibility: wgpu::ShaderStages::FRAGMENT,
+				ty: wgpu::BindingType::Sampler (wgpu::SamplerBindingType::Filtering),
+				count: None,
+			},
+		],
+	});
+	
+	
+	let color_correction_pipeline_layout = render_context.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+		label: Some("color_correction_pipeline_layout"),
+		bind_group_layouts: &[
+			&color_correction_bind_0_layout,
+		],
+		push_constant_ranges: &[],
+	});
+	let color_correction_pipeline = render_context.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+		label: Some("color_correction_pipeline"),
+		layout: Some(&color_correction_pipeline_layout),
+		vertex: wgpu::VertexState {
+			module: &shader,
+			entry_point: "vs_main",
+			buffers: &[],
+			compilation_options: wgpu::PipelineCompilationOptions::default(),
+		},
+		fragment: Some(wgpu::FragmentState {
+			module: &shader,
+			entry_point: "fs_main",
+			targets: &[Some(wgpu::ColorTargetState {
+				format: render_context.surface_config.format,
+				blend: Some(wgpu::BlendState::REPLACE),
+				write_mask: wgpu::ColorWrites::ALL,
+			})],
+			compilation_options: wgpu::PipelineCompilationOptions::default(),
+		}),
+		primitive: wgpu::PrimitiveState {
+			topology: wgpu::PrimitiveTopology::TriangleList,
+			strip_index_format: None,
+			front_face: wgpu::FrontFace::Cw,
+			cull_mode: Some(wgpu::Face::Back),
+			polygon_mode: wgpu::PolygonMode::Fill,
+			unclipped_depth: false,
+			conservative: false,
+		},
+		depth_stencil: None,
+		multisample: wgpu::MultisampleState {
+			count: 1,
+			mask: !0u64,
+			alpha_to_coverage_enabled: false,
+		},
+		multiview: None,
+	});
+	
+	
+	Ok((
+		color_correction_pipeline,
+		color_correction_bind_0_layout,
 	))
 }

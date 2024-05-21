@@ -10,11 +10,13 @@ pub fn load_render_assets(
 	example_model_instance_datas: &[InstanceData],
 	render_context: &RenderContextData,
 	shadowmap_size: u32,
+	color_correction_settings: &ColorCorrectionSettings,
 ) -> Result<RenderAssets> {
 	
-	// general render data
+	// general data
 	let camera = load_camera_render_data(render_context, camera_data).context("Failed to load camera render data.")?;
 	let depth = load_depth_render_data(render_context);
+	let main_tex_view = load_main_tex_data(render_context);
 	let default_sampler = render_context.device.create_sampler(&wgpu::SamplerDescriptor {
 		address_mode_u: wgpu::AddressMode::ClampToEdge,
 		address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -26,13 +28,13 @@ pub fn load_render_assets(
 	});
 	let mut materials_storage = MaterialsStorage::new();
 	
-	// shadow_caster render data
+	// shadow_caster data
 	let shadow_caster = load_shadow_caster_data(render_context, shadowmap_size, shadow_caster_data, camera_data).context("Failed to load shadow caster render data.")?;
 	
-	// models render data
+	// models data
 	let example_models = load_example_models_render_data(render_context, &mut materials_storage, example_model_instance_datas).context("Failed to load model render data.")?;
 	
-	// skybox render data
+	// skybox data
 	let skybox_material_id = load_skybox_material(render_context, &mut materials_storage).context("Failed to load skybox render data.")?;
 	let skybox_sampler = render_context.device.create_sampler(&wgpu::SamplerDescriptor {
 		address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -44,9 +46,19 @@ pub fn load_render_assets(
 		..Default::default()
 	});
 	
+	// color correction data
+	let color_correction_buffer = render_context.device.create_buffer_init(
+		&wgpu::util::BufferInitDescriptor {
+			label: Some("color_correction_buffer"),
+			contents: bytemuck::bytes_of(color_correction_settings),
+			usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+		}
+	);
+	
 	Ok(RenderAssets {
 		
 		depth,
+		main_tex_view,
 		camera,
 		default_sampler,
 		materials_storage,
@@ -57,6 +69,8 @@ pub fn load_render_assets(
 		
 		skybox_material_id,
 		skybox_sampler,
+		
+		color_correction_buffer,
 		
 	})
 }
@@ -108,6 +122,35 @@ pub fn load_depth_render_data(render_context: &RenderContextData) -> DepthRender
 	DepthRenderData {
 		view,
 	}
+}
+
+
+
+
+
+pub fn load_main_tex_data(render_context: &RenderContextData) -> wgpu::TextureView {
+	
+	let size = wgpu::Extent3d {
+		width: render_context.surface_config.width,
+		height: render_context.surface_config.height,
+		depth_or_array_layers: 1,
+	};
+	let desc = wgpu::TextureDescriptor {
+		label: Some("main_texture"),
+		size,
+		mip_level_count: 1,
+		sample_count: 1,
+		dimension: wgpu::TextureDimension::D2,
+		format: render_context.surface_format,
+		usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
+		view_formats: &[],
+	};
+	let texture = render_context.device.create_texture(&desc);
+	
+	let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+	
+	view
+	
 }
 
 
