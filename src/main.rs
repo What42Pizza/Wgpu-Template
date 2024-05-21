@@ -297,6 +297,13 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 		let fps_counter_output = program_data.fps_counter.step(frame_start_time.elapsed());
 		if let Some((average_fps, average_frame_time)) = fps_counter_output {
 			println!("FPS: {average_fps}  (avg frame time: {average_frame_time:?})");
+			//unsafe { // for benchmarking
+			//	static mut TOTAL_TIME: Duration = Duration::ZERO;
+			//	static mut TOTAL_FRAMES: u32 = 0;
+			//	TOTAL_TIME += average_frame_time;
+			//	TOTAL_FRAMES += 1;
+			//	println!("total average: {:?}", TOTAL_TIME / TOTAL_FRAMES);
+			//}
 		}
 		
 		

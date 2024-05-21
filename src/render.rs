@@ -11,7 +11,7 @@ pub fn render(output: &wgpu::SurfaceTexture, program_data: &mut ProgramData) {
 	let visible_models_list = get_visible_models(
 		&program_data.example_model_instance_datas,
 		program_data.render_assets.example_models.bounding_radius,
-		frustum_planes
+		&frustum_planes
 	);
 	
 	update_gpu_buffers(program_data, &visible_models_list);
@@ -26,10 +26,10 @@ pub fn render(output: &wgpu::SurfaceTexture, program_data: &mut ProgramData) {
 
 
 // this is an implementation of frustum culling based on: https://learnopengl.com/Guest-Articles/2021/Scene/Frustum-Culling
-pub fn get_visible_models(instance_datas: &[InstanceData], bounding_radius: f32, frustum_planes: [(glam::Vec3, f32); 5]) -> Vec<usize> {
-	let mut output = vec!();
+pub fn get_visible_models(instance_datas: &[InstanceData], bounding_radius: f32, frustum_planes: &[(glam::Vec3, f32); 5]) -> Vec<usize> {
+	let mut output = Vec::with_capacity(instance_datas.len());
 	for (i, instance) in instance_datas.iter().enumerate() {
-		if model_is_visible(instance.pos, bounding_radius, &frustum_planes) {
+		if model_is_visible(&instance.pos, bounding_radius, &frustum_planes) {
 			output.push(i);
 		}
 	}
@@ -42,20 +42,6 @@ pub fn get_frustum_planes(camera: &CameraData, aspect_ratio: f32) -> [(glam::Vec
 		camera.rot_y.sin(),
 		camera.rot_xz.sin() * camera.rot_y.cos(),
 	).normalize();
-	
-	//let near_plane = { // there's not really any point in checking this plane but you still can if you just want to
-	//	let normal = forward;
-	//	let point_on_plane = camera.pos + forward * camera.near;
-	//	let dist = point_on_plane.dot(forward);
-	//	(normal, dist)
-	//};
-	
-	let far_plane = { // you might be able to remove this one too
-		let normal = -forward;
-		let point_on_plane = camera.pos + forward * camera.far;
-		let dist = point_on_plane.dot(normal);
-		(normal, dist)
-	};
 	
 	let up_dir = glam::Vec3::Y;
 	let right_dir = forward.cross(up_dir).normalize();
@@ -93,19 +79,33 @@ pub fn get_frustum_planes(camera: &CameraData, aspect_ratio: f32) -> [(glam::Vec
 		(normal, dist)
 	};
 	
+	//let near_plane = { // there's not really any point in checking this plane but you still can if you just want to
+	//	let normal = forward;
+	//	let point_on_plane = camera.pos + forward * camera.near;
+	//	let dist = point_on_plane.dot(forward);
+	//	(normal, dist)
+	//};
+	
+	let far_plane = { // you might be able to remove this one too, I have it last b/c it should be the least likely to trigger removal
+		let normal = -forward;
+		let point_on_plane = camera.pos + forward * camera.far;
+		let dist = point_on_plane.dot(normal);
+		(normal, dist)
+	};
+	
 	[far_plane, left_plane, right_plane, top_plane, bottom_plane]
 }
 
-pub fn model_is_visible(pos: glam::Vec3, bounding_radius: f32, frustum_planes: &[(glam::Vec3, f32); 5]) -> bool {
-	is_sphere_past_plane(pos, bounding_radius, frustum_planes[0].0, frustum_planes[0].1)
-		&& is_sphere_past_plane(pos, bounding_radius, frustum_planes[1].0, frustum_planes[1].1)
-		&& is_sphere_past_plane(pos, bounding_radius, frustum_planes[2].0, frustum_planes[2].1)
-		&& is_sphere_past_plane(pos, bounding_radius, frustum_planes[3].0, frustum_planes[3].1)
-		&& is_sphere_past_plane(pos, bounding_radius, frustum_planes[4].0, frustum_planes[4].1)
+pub fn model_is_visible(pos: &glam::Vec3, bounding_radius: f32, frustum_planes: &[(glam::Vec3, f32); 5]) -> bool {
+	is_sphere_past_plane(pos, bounding_radius, &frustum_planes[0].0, frustum_planes[0].1)
+		&& is_sphere_past_plane(pos, bounding_radius, &frustum_planes[1].0, frustum_planes[1].1)
+		&& is_sphere_past_plane(pos, bounding_radius, &frustum_planes[2].0, frustum_planes[2].1)
+		&& is_sphere_past_plane(pos, bounding_radius, &frustum_planes[3].0, frustum_planes[3].1)
+		&& is_sphere_past_plane(pos, bounding_radius, &frustum_planes[4].0, frustum_planes[4].1)
 }
 
-pub fn is_sphere_past_plane(pos: glam::Vec3, radius: f32, plane_normal: glam::Vec3, plane_dist: f32) -> bool {
-	plane_normal.dot(pos) > plane_dist - radius
+pub fn is_sphere_past_plane(pos: &glam::Vec3, radius: f32, plane_normal: &glam::Vec3, plane_dist: f32) -> bool {
+	plane_normal.dot(*pos) > plane_dist - radius
 }
 
 
