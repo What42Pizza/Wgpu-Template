@@ -15,9 +15,10 @@ pub fn insert_material_2d(
 	path: impl Into<PathBuf>,
 	materials_storage: &mut MaterialsStorage,
 	render_context: &RenderContextData,
+	compress_textures: bool,
 ) -> Result<MaterialId> {
 	let output = materials_storage.list_2d.len();
-	let material = load_material_2d(path, render_context).context("Failed to load material_2d.")?;
+	let material = load_material_2d(path, render_context, compress_textures).context("Failed to load material_2d.")?;
 	materials_storage.list_2d.push(material);
 	Ok(output)
 }
@@ -26,9 +27,10 @@ pub fn insert_material_cube(
 	path: impl Into<PathBuf>,
 	materials_storage: &mut MaterialsStorage,
 	render_context: &RenderContextData,
+	compress_textures: bool,
 ) -> Result<MaterialId> {
 	let output = materials_storage.list_cube.len();
-	let material = load_material_cube(path, render_context).context("Failed to load material_cube")?;
+	let material = load_material_cube(path, render_context, compress_textures).context("Failed to load material_cube")?;
 	materials_storage.list_cube.push(material);
 	Ok(output)
 }
@@ -41,6 +43,7 @@ pub fn insert_material_cube(
 pub fn load_material_2d(
 	path: impl Into<PathBuf>,
 	render_context: &RenderContextData,
+	compress_textures: bool,
 ) -> Result<MaterialRenderData> {
 	let path = path.into();
 	
@@ -48,6 +51,17 @@ pub fn load_material_2d(
 	let texture_bytes = image::load_from_memory(&raw_texture_bytes).context("Failed to decode texture.")?;
 	let texture_bytes = texture_bytes.to_rgba8();
 	let dimensions = texture_bytes.dimensions();
+	let mut texture_bytes = texture_bytes.into_raw();
+	
+	if compress_textures {
+		let compress_settings = intel_tex_2::bc7::opaque_fast_settings();
+		texture_bytes = intel_tex_2::bc7::compress_blocks(&compress_settings, &intel_tex_2::Surface {
+			data: &*texture_bytes,
+			width: dimensions.0,
+			height: dimensions.1,
+			stride: dimensions.0 * 4,
+		});
+	}
 	
 	let texture_size = wgpu::Extent3d {
 		width: dimensions.0,
@@ -60,7 +74,7 @@ pub fn load_material_2d(
 			mip_level_count: 1,
 			sample_count: 1,
 			dimension: wgpu::TextureDimension::D2,
-			format: wgpu::TextureFormat::Rgba8UnormSrgb,
+			format: wgpu::TextureFormat::Bc7RgbaUnormSrgb,
 			usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
 			label: None,
 			view_formats: &[],
@@ -97,6 +111,7 @@ pub fn load_material_2d(
 pub fn load_material_cube(
 	path: impl Into<PathBuf>,
 	render_context: &RenderContextData,
+	compress_textures: bool,
 ) -> Result<MaterialRenderData> {
 	let path = path.into();
 	
@@ -104,8 +119,19 @@ pub fn load_material_cube(
 	let texture_bytes = image::load_from_memory(&raw_texture_bytes).context("Failed to decode texture.")?;
 	let texture_bytes = texture_bytes.to_rgba8();
 	let dimensions = texture_bytes.dimensions();
-	let dimensions = (dimensions.0, dimensions.1 / 6);
+	let mut texture_bytes = texture_bytes.into_raw();
 	
+	if compress_textures {
+		let compress_settings = intel_tex_2::bc7::opaque_fast_settings();
+		texture_bytes = intel_tex_2::bc7::compress_blocks(&compress_settings, &intel_tex_2::Surface {
+			data: &*texture_bytes,
+			width: dimensions.0,
+			height: dimensions.1,
+			stride: dimensions.0 * 4,
+		});
+	}
+	
+	let dimensions = (dimensions.0, dimensions.1 / 6);
 	let texture_size = wgpu::Extent3d {
 		width: dimensions.0,
 		height: dimensions.1,

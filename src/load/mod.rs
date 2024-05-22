@@ -46,6 +46,7 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 		&render_context,
 		engine_config.shadowmap_size,
 		&color_correction_settings,
+		engine_config.compress_textures,
 	)?;
 	let render_bindings = load_render_bindings(&render_context, &render_layouts, &render_assets)?;
 	
@@ -142,12 +143,15 @@ pub fn load_engine_config() -> Result<EngineConfig> {
 	let shadowmap_size_i64 = read_hjson_i64(&engine_config, "shadowmap_size", 512);
 	let shadowmap_size = shadowmap_size_i64 as u32;
 	
+	let compress_textures = read_hjson_bool(&engine_config, "compress_textures", true);
+	
 	Ok(EngineConfig {
 		rendering_backend,
 		present_mode,
 		desired_frame_latency,
 		min_frame_time,
 		shadowmap_size,
+		compress_textures,
 	})
 }
 
@@ -180,10 +184,22 @@ pub fn read_hjson_i64(map: &Map<String, Value>, key: &'static str, default: i64)
 pub fn read_hjson_f64(map: &Map<String, Value>, key: &'static str, default: f64) -> f64 {
 	let value_str = map.get(key);
 	let value_f64 = value_str.map(|v| v.as_f64().unwrap_or_else(|| {
-		warn!("Entry '{key}' in 'engine config.hjson' must be an int, defaulting to \"{default}\".");
+		warn!("Entry '{key}' in 'engine config.hjson' must be a number, defaulting to \"{default}\".");
 		default
 	}));
 	value_f64.unwrap_or_else(|| {
+		warn!("Could not find entry '{key}' in 'engine config.hjson', defaulting to \"{default}\".");
+		default
+	})
+}
+
+pub fn read_hjson_bool(map: &Map<String, Value>, key: &'static str, default: bool) -> bool {
+	let value_str = map.get(key);
+	let value_bool = value_str.map(|v| v.as_bool().unwrap_or_else(|| {
+		warn!("Entry '{key}' in 'engine config.hjson' must be a bool, defaulting to \"{default}\".");
+		default
+	}));
+	value_bool.unwrap_or_else(|| {
 		warn!("Could not find entry '{key}' in 'engine config.hjson', defaulting to \"{default}\".");
 		default
 	})
@@ -261,7 +277,7 @@ pub async fn load_render_context_data_async<'a>(window: &'a Window, engine_confi
 	// Open connection to a graphics and/or compute device, Handle to a command queue on a device
 	let (device, command_queue) = adapter.request_device(
 		&wgpu::DeviceDescriptor {
-			required_features: wgpu::Features::empty(),
+			required_features: wgpu::Features::empty() | wgpu::Features::TEXTURE_COMPRESSION_BC,
 			required_limits: wgpu::Limits::downlevel_defaults(),
 			label: None,
 		},

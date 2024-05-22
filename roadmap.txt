@@ -1,11 +1,9 @@
+for later projects:
 post-processing
 	bloom
 	taa?
 gui system?
 text rendering
-texture compression?
-
-for later projects:
 terrain generation
 tree generation
 player movement

@@ -11,6 +11,7 @@ pub fn load_render_assets(
 	render_context: &RenderContextData,
 	shadowmap_size: u32,
 	color_correction_settings: &ColorCorrectionSettings,
+	compress_textures: bool,
 ) -> Result<RenderAssets> {
 	
 	// general data
@@ -32,10 +33,10 @@ pub fn load_render_assets(
 	let shadow_caster = load_shadow_caster_data(render_context, shadowmap_size, shadow_caster_data, camera_data).context("Failed to load shadow caster render data.")?;
 	
 	// models data
-	let example_models = load_example_models_render_data(render_context, &mut materials_storage, example_model_instance_datas).context("Failed to load model render data.")?;
+	let example_models = load_example_models_render_data(render_context, &mut materials_storage, example_model_instance_datas, compress_textures).context("Failed to load model render data.")?;
 	
 	// skybox data
-	let skybox_material_id = load_skybox_material(render_context, &mut materials_storage).context("Failed to load skybox render data.")?;
+	let skybox_material_id = load_skybox_material(render_context, &mut materials_storage, compress_textures).context("Failed to load skybox render data.")?;
 	let skybox_sampler = render_context.device.create_sampler(&wgpu::SamplerDescriptor {
 		address_mode_u: wgpu::AddressMode::ClampToEdge,
 		address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -210,9 +211,10 @@ pub fn load_example_models_render_data(
 	render_context: &RenderContextData,
 	materials_storage: &mut MaterialsStorage,
 	instance_datas: &[InstanceData],
+	compress_textures: bool,
 ) -> Result<ModelsRenderData> {
 	
-	let (example_model_meshes, bounding_radius) = load_model(utils::get_program_file_path("assets/cube.obj"), render_context, materials_storage)?;
+	let (example_model_meshes, bounding_radius) = load_model(utils::get_program_file_path("assets/cube.obj"), render_context, materials_storage, compress_textures)?;
 	
 	let example_model_instance_datas = instance_datas.iter().map(InstanceData::to_raw).collect::<Vec<_>>();
 	let culled_instances_buffer = render_context.device.create_buffer_init(
@@ -246,6 +248,7 @@ pub fn load_model(
 	file_path: impl AsRef<Path>,
 	render_context: &RenderContextData,
 	materials_storage: &mut MaterialsStorage,
+	compress_textures: bool,
 ) -> Result<(Vec<MeshRenderData>, f32)> {
 	let file_path = file_path.as_ref();
 	let obj_text = fs::read_to_string(file_path).add_path_to_error(file_path)?;
@@ -280,7 +283,7 @@ pub fn load_model(
 		let path = parent_folder.join(&diffuse_texture_name);
 		let material_id = match materials_storage_utils::get_material_id(&path, &materials_storage.list_2d) {
 			Some(v) => v,
-			None => materials_storage_utils::insert_material_2d(path, materials_storage, render_context)?,
+			None => materials_storage_utils::insert_material_2d(path, materials_storage, render_context, compress_textures)?,
 		};
 		material_ids.push(material_id);
 	}
@@ -349,6 +352,6 @@ pub fn load_model(
 
 
 
-pub fn load_skybox_material(render_context: &RenderContextData, materials_storage: &mut MaterialsStorage) -> Result<usize> {
-	materials_storage_utils::insert_material_cube(utils::get_program_file_path("assets/skybox.png"), materials_storage, render_context)
+pub fn load_skybox_material(render_context: &RenderContextData, materials_storage: &mut MaterialsStorage, compress_textures: bool) -> Result<usize> {
+	materials_storage_utils::insert_material_cube(utils::get_program_file_path("assets/skybox.png"), materials_storage, render_context, compress_textures)
 }

@@ -1,0 +1,5 @@
+https://github.com/gfx-rs/wgpu/wiki
+catlikecoding.com
+GDC videos
+textbooks :(  (like GPU Gems)
+Gpu Gems: https://developer.nvidia.com/gpugems/gpugems/contributors

@@ -50,6 +50,7 @@ pub struct EngineConfig {
 	pub desired_frame_latency: u32,
 	pub min_frame_time: Duration,
 	pub shadowmap_size: u32,
+	pub compress_textures: bool,
 }
 
 
