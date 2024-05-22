@@ -47,7 +47,7 @@ use crate::prelude::*;
 use std::{env, thread};
 use winit::{
 	application::ApplicationHandler,
-	dpi::PhysicalSize,
+	dpi::{PhysicalPosition, PhysicalSize},
 	event::{KeyEvent, MouseButton, WindowEvent},
 	event_loop::{ActiveEventLoop, EventLoop},
 	keyboard::PhysicalKey,
@@ -87,7 +87,6 @@ fn main() -> Result<()> {
 	info!("Done, initialing program...");
 	let mut program_data = load::load_program_data(start_time, &window)?;
 	window.set_visible(true);
-	window.set_cursor_visible(false);
 	window.focus_window();
 	
 	println!("Done, starting main event_loop...");
@@ -176,10 +175,6 @@ impl<'a> ApplicationHandler for ProgramData<'a> {
 				event_loop.exit();
 			}
 			
-			WindowEvent::Focused (is_focused) => {
-				program_data.input.window_is_focused = is_focused;
-			}
-			
 			WindowEvent::KeyboardInput {
 				event: KeyEvent {
 					physical_key: PhysicalKey::Code (key),
@@ -196,7 +191,20 @@ impl<'a> ApplicationHandler for ProgramData<'a> {
 			}
 			
 			WindowEvent::CursorMoved {device_id: _, position} => {
-				program_data.input.mouse_pos = position;
+				let input = &mut program_data.input;
+				let old_mouse_pos = input.mouse_pos;
+				input.mouse_pos = position;
+				if input.capture_cursor {
+					let size = program_data.render_context.surface_size;
+					let window_center = PhysicalPosition::new(size.width as f64 / 2.0, size.height as f64 / 2.0);
+					if position != window_center {
+						let _ = program_data.render_context.window.set_cursor_position(window_center);	
+					}
+					let old_mouse_pos = window_center; // this kinda shouldn't be needed, but it seems like the position reset is usually mixed with the next mouse movement. If `set_cursor_position()` always triggered its own separate event then this wouldn't be needed
+					input.mouse_vel = PhysicalPosition::new(input.mouse_vel.x + position.x - old_mouse_pos.x, input.mouse_vel.y + position.y - old_mouse_pos.y); // vel += new_pos - old_pos
+				} else {
+					input.mouse_vel = PhysicalPosition::new(input.mouse_vel.x + position.x - old_mouse_pos.x, input.mouse_vel.y + position.y - old_mouse_pos.y); // vel += new_pos - old_pos
+				}
 			}
 			
 			WindowEvent::MouseInput {device_id: _, state, button} => {
@@ -217,7 +225,7 @@ impl<'a> ApplicationHandler for ProgramData<'a> {
 				}
 			}
 			
-			_ => (),
+			_ => {},
 		}
 	}
 	
@@ -315,7 +323,7 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 		surface_output.present();
 		
 		let input = &mut program_data.input;
-		input.prev_mouse_pos = input.mouse_pos;
+		input.mouse_vel = PhysicalPosition::default();
 		input.prev_pressed_keys.clone_from(&input.pressed_keys);
 		input.prev_pressed_mouse_buttons = input.pressed_mouse_buttons.clone();
 		

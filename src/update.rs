@@ -6,18 +6,15 @@ use winit::{dpi::PhysicalPosition, keyboard::KeyCode};
 pub type ShouldExit = bool;
 
 pub fn update(program_data: &mut ProgramData, dt: f32) -> Result<ShouldExit> {
+	let is_focused = program_data.render_context.window.has_focus();
 	
 	let should_exit = process_pre_frame_inputs(program_data);
 	if should_exit {return Ok(true);}
 	
-	if program_data.input.window_is_focused && program_data.is_moving_camera {
-		let size = program_data.render_context.surface_size;
-		let window_center = PhysicalPosition::new(size.width as f64 / 2.0, size.height as f64 / 2.0);
-		let _ = program_data.render_context.window.set_cursor_position(window_center);
-		program_data.input.prev_mouse_pos = window_center; // pretend like the mouse always starts at the middle of the screen (just think about the case where mouse_pos is constantly a bit away from the center, that would mean the mouse has a consistent velocity)
-	}
+	//if is_focused && program_data.is_moving_camera {
+	//}
 	
-	if program_data.input.window_is_focused && program_data.is_moving_camera {
+	if is_focused && program_data.is_moving_camera {
 		update_camera(program_data, dt);
 		//program_data.camera_data.rot_xz = 0.5; // for benchmarking
 		//program_data.camera_data.rot_y = 0.0;
@@ -47,6 +44,7 @@ pub fn process_pre_frame_inputs(program_data: &mut ProgramData) -> ShouldExit {
 	if input.key_just_pressed(KeyCode::Escape) {
 		window.set_cursor_visible(true);
 		program_data.is_moving_camera = false;
+		program_data.input.capture_cursor = false;
 	}
 	
 	false
@@ -62,6 +60,7 @@ pub fn process_post_frame_inputs(program_data: &mut ProgramData) -> ShouldExit {
 	if input.button_just_pressed(MouseButton::Left) {
 		window.set_cursor_visible(false);
 		program_data.is_moving_camera = true;
+		program_data.input.capture_cursor = true;
 		let size = program_data.render_context.surface_size;
 		let window_center = PhysicalPosition::new(size.width as f64 / 2.0, size.height as f64 / 2.0);
 		let _ = program_data.render_context.window.set_cursor_position(window_center);
@@ -110,8 +109,8 @@ fn update_camera(program_data: &mut ProgramData, dt: f32) {
 	
 	let sensitivity = 0.005;
 	let mouse_dt = (
-		(input.mouse_pos.x - input.prev_mouse_pos.x).clamp(-50.0, 50.0) as f32 * sensitivity,
-		(input.mouse_pos.y - input.prev_mouse_pos.y).clamp(-50.0, 50.0) as f32 * sensitivity,
+		input.mouse_vel.x.clamp(-50.0, 50.0) as f32 * sensitivity,
+		input.mouse_vel.y.clamp(-50.0, 50.0) as f32 * sensitivity,
 	);
 	camera_data.rot_xz += mouse_dt.0;
 	camera_data.rot_y = (camera_data.rot_y - mouse_dt.1).clamp(-std::f32::consts::FRAC_PI_2 * 0.999, std::f32::consts::FRAC_PI_2 * 0.999);

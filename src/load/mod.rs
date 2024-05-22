@@ -22,9 +22,9 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 	let input = EngineInput {
 		pressed_keys: HashSet::new(),
 		prev_pressed_keys: HashSet::new(),
-		window_is_focused: true,
-		mouse_pos: PhysicalPosition::new(0.0, 0.0),
-		prev_mouse_pos: PhysicalPosition::new(0.0, 0.0),
+		mouse_pos: PhysicalPosition::default(),
+		mouse_vel: PhysicalPosition::default(),
+		capture_cursor: false,
 		pressed_mouse_buttons: PressedMouseButtons::default(),
 		prev_pressed_mouse_buttons: PressedMouseButtons::default(),
 	};
@@ -62,7 +62,7 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 		shadow_caster_data,
 		example_model_instance_datas,
 		fps_counter,
-		is_moving_camera: true,
+		is_moving_camera: false,
 		color_correction_settings,
 		
 		// render data

@@ -56,11 +56,11 @@ pub struct EngineConfig {
 
 
 pub struct EngineInput {
-	pub window_is_focused: bool,
 	pub pressed_keys: HashSet<KeyCode>,
 	pub prev_pressed_keys: HashSet<KeyCode>,
 	pub mouse_pos: PhysicalPosition<f64>,
-	pub prev_mouse_pos: PhysicalPosition<f64>,
+	pub mouse_vel: PhysicalPosition<f64>,
+	pub capture_cursor: bool,
 	pub pressed_mouse_buttons: PressedMouseButtons,
 	pub prev_pressed_mouse_buttons: PressedMouseButtons,
 }
