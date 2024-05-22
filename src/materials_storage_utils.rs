@@ -74,7 +74,7 @@ pub fn load_material_2d(
 			mip_level_count: 1,
 			sample_count: 1,
 			dimension: wgpu::TextureDimension::D2,
-			format: wgpu::TextureFormat::Bc7RgbaUnormSrgb,
+			format: if compress_textures {wgpu::TextureFormat::Bc7RgbaUnormSrgb} else {wgpu::TextureFormat::Rgba8UnormSrgb},
 			usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
 			label: None,
 			view_formats: &[],
@@ -113,6 +113,8 @@ pub fn load_material_cube(
 	render_context: &RenderContextData,
 	compress_textures: bool,
 ) -> Result<MaterialRenderData> {
+	if compress_textures {warn!("Compressed textures are not currently working for cube textures.")}
+	let compress_textures = false;
 	let path = path.into();
 	
 	let raw_texture_bytes = fs::read(utils::get_program_file_path(&path)).add_path_to_error(&path)?;
@@ -143,7 +145,7 @@ pub fn load_material_cube(
 			mip_level_count: 1,
 			sample_count: 1,
 			dimension: wgpu::TextureDimension::D2,
-			format: wgpu::TextureFormat::Rgba8UnormSrgb,
+			format: if compress_textures {wgpu::TextureFormat::Bc7RgbaUnormSrgb} else {wgpu::TextureFormat::Rgba8UnormSrgb},
 			usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
 			label: None,
 			view_formats: &[],

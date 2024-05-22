@@ -83,11 +83,14 @@ fn main() -> Result<()> {
 		}
 	};
 	
-	window.focus_window();
-	window.set_cursor_visible(false);
 	
-	info!("Done, starting main event_loop...");
+	info!("Done, initialing program...");
 	let mut program_data = load::load_program_data(start_time, &window)?;
+	window.set_visible(true);
+	window.set_cursor_visible(false);
+	window.focus_window();
+	
+	println!("Done, starting main event_loop...");
 	event_loop.run_app(&mut program_data)?;
 	
 	Ok(())
@@ -110,6 +113,7 @@ impl ApplicationHandler for InitData {
 		if self.window.is_none() {
 			let window_attributes = Window::default_attributes()
 				.with_title("WGPU Testing")
+				.with_visible(false)
 				.with_inner_size(PhysicalSize::new(1280, 720));
 			let window = event_loop.create_window(window_attributes).expect("Could not init window.");
 			window.request_redraw();
