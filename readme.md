@@ -2,7 +2,9 @@
 
 This is a template for using Rust + Winit + Wgpu to build native desktop programs. I don't exactly expect others to want to use this, but it'll still be very useful for myself (not just for making programs, but also updating this template's dependencies to see how to update other programs' dependencies).
 
-## NOTE: Even though I'd like for this to work on any OS, only Windows 10 is tested for now.
+## NOTES
+- Even though I'd like for this to work on any OS, only Windows 10 is tested for now.
+- You may want to use sdl3-rs instead of winit, you can see how to do so [here](https://github.com/revmischa/sdl3-rs/blob/master/examples/raw-window-handle-with-wgpu/main.rs)
 
 <br>
 
@@ -18,10 +20,9 @@ This is a template for using Rust + Winit + Wgpu to build native desktop program
 
 ## Qualities:
 
-- **Simple, but Upfront** &nbsp; everything has the most straight-forward implementation I could think of, but none of the complexity is trying to be hidden
-- **Flexible** &nbsp; this is my measure for how clean code is, and I always strive to keep my code as maluable as possible
+- **Hackable** &nbsp; everything is simple and flexible, and features can be added / removed with ease
 - **Well Documented** &nbsp; self-documented wherever possible, with comments to explain any oddities
-- **Up-to-date Dependencies** &nbsp; uses the latest crates available, at least at the time of writing this
+- **Up-to-date Dependencies** &nbsp; uses the latest crates available, at least at the time of writing this (no deprecated code either)
 - **Thorough Error Handling**
 
 <br>

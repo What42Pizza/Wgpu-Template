@@ -25,6 +25,7 @@
 
 pub mod load;
 pub mod update;
+pub mod update_gpu_buffers;
 pub mod render;
 pub mod data;
 pub mod materials_storage_utils;
@@ -39,6 +40,7 @@ pub mod prelude {
 		time::{Duration, Instant}
 	};
 	pub use std::result::Result as StdResult;
+	pub use rayon::iter::{ParallelIterator, IntoParallelRefIterator};
 	pub use log::{info, warn, debug, error};
 	pub use anyhow::*;
 }
@@ -249,6 +251,7 @@ pub fn resize(program_data: &mut ProgramData, new_size: PhysicalSize<u32>) -> Re
 	if new_size.width == 0 || new_size.height == 0 {return Ok(());}
 	render_context.drawable_surface.configure(&render_context.device, &render_context.surface_config);
 	program_data.render_assets.depth = load::load_depth_render_data(render_context);
+	program_data.render_assets.main_tex_view = load::load_main_tex_data(render_context);
 	Ok(())
 }
 
@@ -296,6 +299,8 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 			StdResult::Err(err) => return Err(err.into()),
 		};
 		
+		update_gpu_buffers::update_gpu_buffers(program_data);
+		
 		render::render(&surface_output, program_data);
 		
 		
@@ -310,11 +315,16 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 		if let Some((average_fps, average_frame_time)) = fps_counter_output {
 			println!("FPS: {average_fps}  (avg frame time: {average_frame_time:?})");
 			//unsafe { // for benchmarking
-			//	static mut TOTAL_TIME: Duration = Duration::ZERO;
-			//	static mut TOTAL_FRAMES: u32 = 0;
-			//	TOTAL_TIME += average_frame_time;
-			//	TOTAL_FRAMES += 1;
-			//	println!("total average: {:?}", TOTAL_TIME / TOTAL_FRAMES);
+			//	static mut FRAMES_TO_SKIP: usize = 3;
+			//	if FRAMES_TO_SKIP > 0 {
+			//		FRAMES_TO_SKIP -= 1;
+			//	} else {
+			//		static mut TOTAL_TIME: Duration = Duration::ZERO;
+			//		static mut TOTAL_FRAMES: u32 = 0;
+			//		TOTAL_TIME += average_frame_time;
+			//		TOTAL_FRAMES += 1;
+			//		println!("total average: {:?}", TOTAL_TIME / TOTAL_FRAMES);
+			//	}
 			//}
 		}
 		

@@ -251,10 +251,10 @@ pub fn load_model(
 	compress_textures: bool,
 ) -> Result<(Vec<MeshRenderData>, f32)> {
 	let file_path = file_path.as_ref();
+	let parent_folder = file_path.parent().expect("Cannot load mesh at root directory");
 	let obj_text = fs::read_to_string(file_path).add_path_to_error(file_path)?;
 	let obj_cursor = Cursor::new(obj_text);
 	let mut obj_reader = BufReader::new(obj_cursor);
-	let parent_folder = file_path.parent().expect("Cannot load mesh at root directory");
 	
 	let (models, model_materials) = tobj::load_obj_buf(
 		&mut obj_reader,

@@ -3002,6 +3002,7 @@ dependencies = [
  "intel_tex_2",
  "lazy_static",
  "log",
+ "rayon",
  "serde 1.0.199",
  "serde-hjson",
  "tobj",

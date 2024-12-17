@@ -11,14 +11,11 @@ pub fn update(program_data: &mut ProgramData, dt: f32) -> Result<ShouldExit> {
 	let should_exit = process_pre_frame_inputs(program_data);
 	if should_exit {return Ok(true);}
 	
-	//if is_focused && program_data.is_moving_camera {
-	//}
-	
 	if is_focused && program_data.is_moving_camera {
 		update_camera(program_data, dt);
-		//program_data.camera_data.rot_xz = 0.5; // for benchmarking
-		//program_data.camera_data.rot_y = 0.0;
 	}
+	//program_data.camera_data.rot_xz = 0.5; // for benchmarking
+	//program_data.camera_data.rot_y = 0.0;
 	
 	let should_exit = process_post_frame_inputs(program_data);
 	if should_exit {return Ok(true);}
