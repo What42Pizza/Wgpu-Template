@@ -70,7 +70,8 @@ pub fn load_program_data(start_time: Instant, window: &Window) -> Result<Program
 		render_layouts,
 		render_assets,
 		render_bindings,
-		frame_start_instant: start_time,
+		dt_frame_start: start_time,
+		min_dur_frame_start: start_time,
 		
 	})
 }
@@ -280,6 +281,7 @@ pub async fn load_render_context_data_async<'a>(window: &'a Window, engine_confi
 			required_features: wgpu::Features::empty() | wgpu::Features::TEXTURE_COMPRESSION_BC,
 			required_limits: wgpu::Limits::downlevel_defaults(),
 			label: None,
+			memory_hints: wgpu::MemoryHints::Performance,
 		},
 		None,
 	).await.context("Failed to create connection to gpu.")?;
@@ -300,6 +302,9 @@ pub async fn load_render_context_data_async<'a>(window: &'a Window, engine_confi
 		desired_maximum_frame_latency: engine_config.desired_frame_latency,
 	};
 	surface.configure(&device, &surface_config);
+	
+	//let limits = device.limits();
+	//println!("Max 2D Texture Array Layers: {}", limits.max_texture_array_layers);
 	
 	Ok(RenderContextData {
 		window,

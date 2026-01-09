@@ -1,6 +1,5 @@
-use rayon::iter::IndexedParallelIterator;
-
 use crate::prelude::*;
+use rayon::iter::IndexedParallelIterator;
 
 
 

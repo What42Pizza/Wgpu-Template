@@ -13,7 +13,7 @@ fn vs_main(
 ) -> VertexOutput {
 	var output: VertexOutput;
 	
-	// hacky way to draw a single large triangle that convers the entire screen
+	// hacky way to draw a single large triangle that covers the entire screen
 	output.screen_pos = vec4(
 		f32(i32(index) / 2) * 4.0 - 1.0,
 		f32(i32(index) & 1) * 4.0 - 1.0,

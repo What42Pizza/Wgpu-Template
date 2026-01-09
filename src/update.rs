@@ -104,10 +104,10 @@ fn update_camera(program_data: &mut ProgramData, dt: f32) {
 		camera_data.pos.y -= speed;
 	}
 	
-	let sensitivity = 0.005;
+	let sensitivity = 0.004;
 	let mouse_dt = (
-		input.mouse_vel.x.clamp(-50.0, 50.0) as f32 * sensitivity,
-		input.mouse_vel.y.clamp(-50.0, 50.0) as f32 * sensitivity,
+		input.mouse_vel.x as f32 * sensitivity,
+		input.mouse_vel.y as f32 * sensitivity,
 	);
 	camera_data.rot_xz += mouse_dt.0;
 	camera_data.rot_y = (camera_data.rot_y - mouse_dt.1).clamp(-std::f32::consts::FRAC_PI_2 * 0.999, std::f32::consts::FRAC_PI_2 * 0.999);

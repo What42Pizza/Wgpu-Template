@@ -54,7 +54,7 @@ use winit::{
 	event_loop::{ActiveEventLoop, EventLoop},
 	keyboard::PhysicalKey,
 	platform::pump_events::EventLoopExtPumpEvents,
-	window::{Window, WindowId}
+	window::{Fullscreen, Window, WindowId}
 };
 
 
@@ -84,7 +84,6 @@ fn main() -> Result<()> {
 			break window;
 		}
 	};
-	
 	
 	info!("Done, initialing program...");
 	let mut program_data = load::load_program_data(start_time, &window)?;
@@ -304,13 +303,6 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 		render::render(&surface_output, program_data);
 		
 		
-		let frame_time = frame_start_time.elapsed();
-		let min_frame_time = program_data.engine_config.min_frame_time;
-		if frame_time < min_frame_time {
-			let sleep_time = min_frame_time - frame_time;
-			thread::sleep(sleep_time);
-		}
-		
 		let fps_counter_output = program_data.fps_counter.step(frame_start_time.elapsed());
 		if let Some((average_fps, average_frame_time)) = fps_counter_output {
 			println!("FPS: {average_fps}  (avg frame time: {average_frame_time:?})");
@@ -327,6 +319,15 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 			//	}
 			//}
 		}
+		
+		
+		let frame_time = program_data.min_dur_frame_start.elapsed();
+		let min_frame_time = program_data.engine_config.min_frame_time;
+		if frame_time < min_frame_time {
+			let sleep_time = min_frame_time - frame_time;
+			thread::sleep(sleep_time);
+		}
+		program_data.min_dur_frame_start = Instant::now();
 		
 		
 		program_data.render_context.window.pre_present_notify();

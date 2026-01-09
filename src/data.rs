@@ -27,15 +27,16 @@ pub struct ProgramData<'a> {
 	pub render_layouts: RenderLayouts,
 	pub render_assets: RenderAssets,
 	pub render_bindings: RenderBindings,
-	pub frame_start_instant: Instant,
+	pub dt_frame_start: Instant,
+	pub min_dur_frame_start: Instant,
 	
 }
 
 impl<'a> ProgramData<'a> {
 	pub fn step_dt(&mut self) -> f32 {
 		let new_frame_instant = Instant::now();
-		let dt = (new_frame_instant - self.frame_start_instant).as_secs_f32();
-		self.frame_start_instant = new_frame_instant;
+		let dt = (new_frame_instant - self.dt_frame_start).as_secs_f32();
+		self.dt_frame_start = new_frame_instant;
 		dt
 	}
 }

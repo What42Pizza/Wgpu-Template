@@ -90,7 +90,7 @@ pub fn load_shadow_caster_layouts(render_context: &RenderContextData) -> Result<
 		layout: Some(&shadow_caster_pipeline_layout),
 		vertex: wgpu::VertexState {
 			module: &shadow_caster_shader,
-			entry_point: "vs_main",
+			entry_point: Some("vs_main"),
 			buffers: &[
 				BasicVertexData::get_layout(),
 				RawInstanceData::get_layout()
@@ -120,10 +120,11 @@ pub fn load_shadow_caster_layouts(render_context: &RenderContextData) -> Result<
 		}),
 		multisample: wgpu::MultisampleState {
 			count: 1,
-			mask: !0u64,
+			mask: u64::MAX,
 			alpha_to_coverage_enabled: false,
 		},
 		multiview: None,
+		cache: None,
 	});
 	
 	
@@ -231,7 +232,7 @@ pub fn load_models_layouts(render_context: &RenderContextData) -> Result<(
 		layout: Some(&models_pipeline_layout),
 		vertex: wgpu::VertexState {
 			module: &models_shader,
-			entry_point: "vs_main",
+			entry_point: Some("vs_main"),
 			buffers: &[
 				BasicVertexData::get_layout(),
 				ExtendedVertexData::get_layout(),
@@ -241,7 +242,7 @@ pub fn load_models_layouts(render_context: &RenderContextData) -> Result<(
 		},
 		fragment: Some(wgpu::FragmentState {
 			module: &models_shader,
-			entry_point: "fs_main",
+			entry_point: Some("fs_main"),
 			targets: &[Some(wgpu::ColorTargetState {
 				format: render_context.surface_config.format,
 				blend: Some(wgpu::BlendState::REPLACE),
@@ -267,10 +268,11 @@ pub fn load_models_layouts(render_context: &RenderContextData) -> Result<(
 		}),
 		multisample: wgpu::MultisampleState {
 			count: 1,
-			mask: !0u64,
+			mask: u64::MAX,
 			alpha_to_coverage_enabled: false,
 		},
 		multiview: None,
+		cache: None,
 	});
 	
 	
@@ -344,13 +346,13 @@ pub fn load_skybox_layouts(render_context: &RenderContextData) -> Result<(
 		layout: Some(&skybox_pipeline_layout),
 		vertex: wgpu::VertexState {
 			module: &shader,
-			entry_point: "vs_main",
+			entry_point: Some("vs_main"),
 			buffers: &[],
 			compilation_options: wgpu::PipelineCompilationOptions::default(),
 		},
 		fragment: Some(wgpu::FragmentState {
 			module: &shader,
-			entry_point: "fs_main",
+			entry_point: Some("fs_main"),
 			targets: &[Some(wgpu::ColorTargetState {
 				format: render_context.surface_config.format,
 				blend: Some(wgpu::BlendState::REPLACE),
@@ -376,10 +378,11 @@ pub fn load_skybox_layouts(render_context: &RenderContextData) -> Result<(
 		}),
 		multisample: wgpu::MultisampleState {
 			count: 1,
-			mask: !0u64,
+			mask: u64::MAX,
 			alpha_to_coverage_enabled: false,
 		},
 		multiview: None,
+		cache: None,
 	});
 	
 	
@@ -452,13 +455,13 @@ pub fn load_color_correction_layouts(render_context: &RenderContextData) -> Resu
 		layout: Some(&color_correction_pipeline_layout),
 		vertex: wgpu::VertexState {
 			module: &shader,
-			entry_point: "vs_main",
+			entry_point: Some("vs_main"),
 			buffers: &[],
 			compilation_options: wgpu::PipelineCompilationOptions::default(),
 		},
 		fragment: Some(wgpu::FragmentState {
 			module: &shader,
-			entry_point: "fs_main",
+			entry_point: Some("fs_main"),
 			targets: &[Some(wgpu::ColorTargetState {
 				format: render_context.surface_config.format,
 				blend: Some(wgpu::BlendState::REPLACE),
@@ -478,10 +481,11 @@ pub fn load_color_correction_layouts(render_context: &RenderContextData) -> Resu
 		depth_stencil: None,
 		multisample: wgpu::MultisampleState {
 			count: 1,
-			mask: !0u64,
+			mask: u64::MAX,
 			alpha_to_coverage_enabled: false,
 		},
 		multiview: None,
+		cache: None,
 	});
 	
 	

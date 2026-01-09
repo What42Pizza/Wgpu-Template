@@ -1,0 +1,7 @@
+Bind groups allow shaders to access textures and uniforms
+Switching to a bind group is costly and should be minimized
+
+
+
+Render passes are very expensive
+A render pass is defined its color attachments (output) and depth stencil

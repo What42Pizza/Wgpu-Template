@@ -20,7 +20,7 @@ This is a template for using Rust + Winit + Wgpu to build native desktop program
 
 ## Qualities:
 
-- **Hackable** &nbsp; everything is simple and flexible, and features can be added / removed with ease
+- **Hackable** &nbsp; everything is simple and flexible, and features can be added / removed with ease (at least in theory)
 - **Well Documented** &nbsp; self-documented wherever possible, with comments to explain any oddities
 - **Up-to-date Dependencies** &nbsp; uses the latest crates available, at least at the time of writing this (no deprecated code either)
 - **Thorough Error Handling**
