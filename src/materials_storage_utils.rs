@@ -82,14 +82,14 @@ pub fn load_material_2d(
 	);
 	
 	render_context.command_queue.write_texture(
-		wgpu::ImageCopyTexture {
+		wgpu::TexelCopyTextureInfo {
 			texture: &texture,
 			mip_level: 0,
 			origin: wgpu::Origin3d::ZERO,
 			aspect: wgpu::TextureAspect::All,
 		},
 		&texture_bytes,
-		wgpu::ImageDataLayout {
+		wgpu::TexelCopyBufferLayout {
 			offset: 0,
 			bytes_per_row: Some(4 * dimensions.0),
 			rows_per_image: Some(dimensions.1),
@@ -153,14 +153,14 @@ pub fn load_material_cube(
 	);
 	
 	render_context.command_queue.write_texture(
-		wgpu::ImageCopyTexture {
+		wgpu::TexelCopyTextureInfo {
 			texture: &texture,
 			mip_level: 0,
 			origin: wgpu::Origin3d::ZERO,
 			aspect: wgpu::TextureAspect::All,
 		},
 		&texture_bytes,
-		wgpu::ImageDataLayout {
+		wgpu::TexelCopyBufferLayout {
 			offset: 0,
 			bytes_per_row: Some(4 * dimensions.0),
 			rows_per_image: Some(dimensions.1),

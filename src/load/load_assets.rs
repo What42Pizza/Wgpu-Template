@@ -24,7 +24,7 @@ pub fn load_render_assets(
 		address_mode_w: wgpu::AddressMode::ClampToEdge,
 		mag_filter: wgpu::FilterMode::Linear,
 		min_filter: wgpu::FilterMode::Nearest,
-		mipmap_filter: wgpu::FilterMode::Nearest,
+		mipmap_filter: wgpu::MipmapFilterMode::Nearest,
 		..Default::default()
 	});
 	let mut materials_storage = MaterialsStorage::new();
@@ -43,7 +43,7 @@ pub fn load_render_assets(
 		address_mode_w: wgpu::AddressMode::ClampToEdge,
 		mag_filter: wgpu::FilterMode::Linear,
 		min_filter: wgpu::FilterMode::Nearest,
-		mipmap_filter: wgpu::FilterMode::Nearest,
+		mipmap_filter: wgpu::MipmapFilterMode::Nearest,
 		..Default::default()
 	});
 	
@@ -183,7 +183,7 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 		address_mode_w: wgpu::AddressMode::ClampToEdge,
 		mag_filter: wgpu::FilterMode::Linear,
 		min_filter: wgpu::FilterMode::Linear,
-		mipmap_filter: wgpu::FilterMode::Nearest,
+		mipmap_filter: wgpu::MipmapFilterMode::Nearest,
 		compare: Some(wgpu::CompareFunction::LessEqual),
 		..Default::default()
 	});

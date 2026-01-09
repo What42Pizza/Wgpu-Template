@@ -1,5 +1,5 @@
 // Started:      24/04/18
-// Last updated: 24/05/21
+// Last updated: 26/01/08
 
 // Learn Wgpu website: https://sotrh.github.io/learn-wgpu/
 // Learn Wgpu repo: https://github.com/sotrh/learn-wgpu
@@ -8,7 +8,6 @@
 
 
 #![feature(duration_constants)]
-#![feature(let_chains)]
 
 #![allow(unused)]
 #![warn(unused_must_use)]
@@ -63,7 +62,10 @@ fn main() -> Result<()> {
 	let start_time = Instant::now();
 	
 	if env::var("RUST_LOG").is_err() {
-		env::set_var("RUST_LOG", "warn");
+		unsafe {
+			// safety: this seems to only be unsafe if other threads might be reading/writing env vars, and that should not be possible yet since this is the start of the program
+			env::set_var("RUST_LOG", "warn");
+		}
 	}
 	env_logger::init();
 	
@@ -251,6 +253,7 @@ pub fn resize(program_data: &mut ProgramData, new_size: PhysicalSize<u32>) -> Re
 	render_context.drawable_surface.configure(&render_context.device, &render_context.surface_config);
 	program_data.render_assets.depth = load::load_depth_render_data(render_context);
 	program_data.render_assets.main_tex_view = load::load_main_tex_data(render_context);
+	program_data.render_bindings = load::load_render_bindings(&program_data.render_context, &program_data.render_layouts, &program_data.render_assets)?;
 	Ok(())
 }
 

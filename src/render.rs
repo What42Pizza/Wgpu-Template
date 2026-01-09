@@ -37,6 +37,7 @@ pub fn render_shadow_caster_pipeline(program_data: &ProgramData, encoder: &mut w
 			}),
 			stencil_ops: None,
 		}),
+		multiview_mask: None,
 		occlusion_query_set: None,
 		timestamp_writes: None,
 	});
@@ -64,6 +65,7 @@ pub fn render_models_pipeline(program_data: &ProgramData, encoder: &mut wgpu::Co
 		label: Some("models_render_pass"),
 		color_attachments: &[Some(wgpu::RenderPassColorAttachment {
 			view: main_tex_view,
+			depth_slice: None,
 			resolve_target: None,
 			ops: wgpu::Operations {
 				load: wgpu::LoadOp::Clear (wgpu::Color {
@@ -83,6 +85,7 @@ pub fn render_models_pipeline(program_data: &ProgramData, encoder: &mut wgpu::Co
 			}),
 			stencil_ops: None,
 		}),
+		multiview_mask: None,
 		occlusion_query_set: None,
 		timestamp_writes: None,
 	});
@@ -112,6 +115,7 @@ pub fn render_skybox_pipeline(program_data: &ProgramData, encoder: &mut wgpu::Co
 		label: Some("skybox_render_pass"),
 		color_attachments: &[Some(wgpu::RenderPassColorAttachment {
 			view: main_tex_view,
+			depth_slice: None,
 			resolve_target: None,
 			ops: wgpu::Operations {
 				load: wgpu::LoadOp::Load,
@@ -126,6 +130,7 @@ pub fn render_skybox_pipeline(program_data: &ProgramData, encoder: &mut wgpu::Co
 			}),
 			stencil_ops: None,
 		}),
+		multiview_mask: None,
 		occlusion_query_set: None,
 		timestamp_writes: None,
 	});
@@ -148,6 +153,7 @@ pub fn render_color_correction_pipeline(program_data: &ProgramData, encoder: &mu
 		label: Some("color_correction_render_pass"),
 		color_attachments: &[Some(wgpu::RenderPassColorAttachment {
 			view: output_view,
+			depth_slice: None,
 			resolve_target: None,
 			ops: wgpu::Operations {
 				load: wgpu::LoadOp::Load,
@@ -155,6 +161,7 @@ pub fn render_color_correction_pipeline(program_data: &ProgramData, encoder: &mu
 			},
 		})],
 		depth_stencil_attachment: None,
+		multiview_mask: None,
 		occlusion_query_set: None,
 		timestamp_writes: None,
 	});

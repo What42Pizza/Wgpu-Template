@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use async_std::task::block_on;
+use wgpu::ExperimentalFeatures;
 use winit::{dpi::PhysicalPosition, window::Window};
 use serde_hjson::{Map, Value};
 
@@ -16,7 +16,7 @@ pub use load_bindings::*;
 
 
 
-pub fn load_program_data(start_time: Instant, window: &Window) -> Result<ProgramData> {
+pub fn load_program_data<'a>(start_time: Instant, window: &'a Window) -> Result<ProgramData<'a>> {
 	
 	let engine_config = load_engine_config().context("Failed to load engine config.")?;
 	let input = EngineInput {
@@ -243,7 +243,7 @@ pub fn load_example_model_instance_datas() -> Vec<InstanceData> {
 
 
 pub fn load_render_context_data<'a>(window: &'a Window, engine_config: &load::EngineConfig) -> Result<RenderContextData<'a>> {
-	block_on(load_render_context_data_async(window, engine_config))
+	smol::block_on(load_render_context_data_async(window, engine_config))
 }
 
 pub async fn load_render_context_data_async<'a>(window: &'a Window, engine_config: &load::EngineConfig) -> Result<RenderContextData<'a>> {
@@ -251,7 +251,7 @@ pub async fn load_render_context_data_async<'a>(window: &'a Window, engine_confi
 	
 	// The instance is a handle to our GPU
 	// Backends::all => Vulkan + Metal + DX12 + Browser WebGPU
-	let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+	let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
 		backends: engine_config.rendering_backend,
 		..Default::default()
 	});
@@ -266,25 +266,17 @@ pub async fn load_render_context_data_async<'a>(window: &'a Window, engine_confi
 			compatible_surface: Some(&surface),
 			force_fallback_adapter: false,
 		},
-	).await;
-	if adapter.is_none() {
-		adapter =
-			instance
-			.enumerate_adapters(wgpu::Backends::all()).into_iter()
-			.find(|adapter| adapter.is_surface_supported(&surface));
-	}
-	let Some(adapter) = adapter else {return Err(Error::msg("Unable to find suitable adapter."));};
+	).await.context("Failed to obtain gpu adapter")?;
 	
 	// Open connection to a graphics and/or compute device, Handle to a command queue on a device
-	let (device, command_queue) = adapter.request_device(
-		&wgpu::DeviceDescriptor {
-			required_features: wgpu::Features::empty() | wgpu::Features::TEXTURE_COMPRESSION_BC,
-			required_limits: wgpu::Limits::downlevel_defaults(),
-			label: None,
-			memory_hints: wgpu::MemoryHints::Performance,
-		},
-		None,
-	).await.context("Failed to create connection to gpu.")?;
+	let (device, command_queue) = adapter.request_device(&wgpu::DeviceDescriptor {
+		label: None,
+		required_features: wgpu::Features::empty() | wgpu::Features::TEXTURE_COMPRESSION_BC,
+		required_limits: wgpu::Limits::downlevel_defaults(),
+		experimental_features: ExperimentalFeatures::default(),
+		memory_hints: wgpu::MemoryHints::Performance,
+		trace: wgpu::Trace::Off,
+	}).await.context("Failed to create connection to gpu.")?;
 	
 	let surface_caps = surface.get_capabilities(&adapter);
 	let surface_format = surface_caps.formats.iter()

@@ -83,7 +83,7 @@ pub fn load_shadow_caster_layouts(render_context: &RenderContextData) -> Result<
 		bind_group_layouts: &[
 			&shadow_caster_bind_0_layout,
 		],
-		push_constant_ranges: &[],
+		immediate_size: 0,
 	});
 	let shadow_caster_pipeline = render_context.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
 		label: Some("shadow_caster_pipeline"),
@@ -123,7 +123,7 @@ pub fn load_shadow_caster_layouts(render_context: &RenderContextData) -> Result<
 			mask: u64::MAX,
 			alpha_to_coverage_enabled: false,
 		},
-		multiview: None,
+		multiview_mask: None,
 		cache: None,
 	});
 	
@@ -225,7 +225,7 @@ pub fn load_models_layouts(render_context: &RenderContextData) -> Result<(
 			&models_bind_0_layout,
 			&models_bind_1_layout,
 		],
-		push_constant_ranges: &[],
+		immediate_size: 0,
 	});
 	let models_pipeline = render_context.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
 		label: Some("models_render_pipeline"),
@@ -271,7 +271,7 @@ pub fn load_models_layouts(render_context: &RenderContextData) -> Result<(
 			mask: u64::MAX,
 			alpha_to_coverage_enabled: false,
 		},
-		multiview: None,
+		multiview_mask: None,
 		cache: None,
 	});
 	
@@ -339,7 +339,7 @@ pub fn load_skybox_layouts(render_context: &RenderContextData) -> Result<(
 		bind_group_layouts: &[
 			&skybox_bind_0_layout,
 		],
-		push_constant_ranges: &[],
+		immediate_size: 0,
 	});
 	let skybox_pipeline = render_context.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
 		label: Some("skybox_pipeline"),
@@ -381,7 +381,7 @@ pub fn load_skybox_layouts(render_context: &RenderContextData) -> Result<(
 			mask: u64::MAX,
 			alpha_to_coverage_enabled: false,
 		},
-		multiview: None,
+		multiview_mask: None,
 		cache: None,
 	});
 	
@@ -448,7 +448,7 @@ pub fn load_color_correction_layouts(render_context: &RenderContextData) -> Resu
 		bind_group_layouts: &[
 			&color_correction_bind_0_layout,
 		],
-		push_constant_ranges: &[],
+		immediate_size: 0,
 	});
 	let color_correction_pipeline = render_context.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
 		label: Some("color_correction_pipeline"),
@@ -484,7 +484,7 @@ pub fn load_color_correction_layouts(render_context: &RenderContextData) -> Resu
 			mask: u64::MAX,
 			alpha_to_coverage_enabled: false,
 		},
-		multiview: None,
+		multiview_mask: None,
 		cache: None,
 	});
 	

@@ -104,7 +104,7 @@ fn update_camera(program_data: &mut ProgramData, dt: f32) {
 		camera_data.pos.y -= speed;
 	}
 	
-	let sensitivity = 0.004;
+	let sensitivity = 0.001;
 	let mouse_dt = (
 		input.mouse_vel.x as f32 * sensitivity,
 		input.mouse_vel.y as f32 * sensitivity,
