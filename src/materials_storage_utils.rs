@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::*;
 
 // HELP: The purpose of this is to make sure textures are only loaded once
 
@@ -14,7 +14,7 @@ pub fn get_material_id(path: impl AsRef<Path>, list: &[MaterialRenderData]) -> O
 pub fn insert_material_2d(
 	path: impl Into<PathBuf>,
 	materials_storage: &mut MaterialsStorage,
-	render_context: &RenderContextData,
+	render_context: &RenderContext,
 	compress_textures: bool,
 ) -> Result<MaterialId> {
 	let output = materials_storage.list_2d.len();
@@ -26,7 +26,7 @@ pub fn insert_material_2d(
 pub fn insert_material_cube(
 	path: impl Into<PathBuf>,
 	materials_storage: &mut MaterialsStorage,
-	render_context: &RenderContextData,
+	render_context: &RenderContext,
 	compress_textures: bool,
 ) -> Result<MaterialId> {
 	let output = materials_storage.list_cube.len();
@@ -42,12 +42,12 @@ pub fn insert_material_cube(
 // WARNING: This is only meant to be used by 'load_material_to_storage'. Loading materials with this manually could lead to several copies of the same image, which is wasteful
 pub fn load_material_2d(
 	path: impl Into<PathBuf>,
-	render_context: &RenderContextData,
+	render_context: &RenderContext,
 	compress_textures: bool,
 ) -> Result<MaterialRenderData> {
 	let path = path.into();
 	
-	let raw_texture_bytes = fs::read(utils::get_program_file_path(&path)).add_path_to_error(&path)?;
+	let raw_texture_bytes = fs_read(utils::get_program_file_path(&path))?;
 	let texture_bytes = image::load_from_memory(&raw_texture_bytes).context("Failed to decode texture.")?;
 	let texture_bytes = texture_bytes.to_rgba8();
 	let dimensions = texture_bytes.dimensions();
@@ -68,7 +68,7 @@ pub fn load_material_2d(
 		height: dimensions.1,
 		depth_or_array_layers: 1,
 	};
-	let texture = render_context.device.create_texture(
+	let texture = render_context.gpu_device.create_texture(
 		&wgpu::TextureDescriptor {
 			size: texture_size,
 			mip_level_count: 1,
@@ -81,7 +81,7 @@ pub fn load_material_2d(
 		}
 	);
 	
-	render_context.command_queue.write_texture(
+	render_context.gpu_command_queue.write_texture(
 		wgpu::TexelCopyTextureInfo {
 			texture: &texture,
 			mip_level: 0,
@@ -110,14 +110,14 @@ pub fn load_material_2d(
 // WARNING: This is only meant to be used by 'load_material_to_storage'. Loading materials with this manually could lead to several copies of the same image, which is wasteful
 pub fn load_material_cube(
 	path: impl Into<PathBuf>,
-	render_context: &RenderContextData,
+	render_context: &RenderContext,
 	compress_textures: bool,
 ) -> Result<MaterialRenderData> {
 	if compress_textures {warn!("Compressed textures are not currently working for cube textures.")}
 	let compress_textures = false;
 	let path = path.into();
 	
-	let raw_texture_bytes = fs::read(utils::get_program_file_path(&path)).add_path_to_error(&path)?;
+	let raw_texture_bytes = fs_read(utils::get_program_file_path(&path))?;
 	let texture_bytes = image::load_from_memory(&raw_texture_bytes).context("Failed to decode texture.")?;
 	let texture_bytes = texture_bytes.to_rgba8();
 	let dimensions = texture_bytes.dimensions();
@@ -139,7 +139,7 @@ pub fn load_material_cube(
 		height: dimensions.1,
 		depth_or_array_layers: 6,
 	};
-	let texture = render_context.device.create_texture(
+	let texture = render_context.gpu_device.create_texture(
 		&wgpu::TextureDescriptor {
 			size: texture_size,
 			mip_level_count: 1,
@@ -152,7 +152,7 @@ pub fn load_material_cube(
 		}
 	);
 	
-	render_context.command_queue.write_texture(
+	render_context.gpu_command_queue.write_texture(
 		wgpu::TexelCopyTextureInfo {
 			texture: &texture,
 			mip_level: 0,

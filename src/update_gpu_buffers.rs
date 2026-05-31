@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::*;
 
 
 
@@ -19,7 +19,7 @@ pub fn update_gpu_buffers(program_data: &mut ProgramData) {
 			new_model_instances_data.push(program_data.example_model_instance_datas[i].to_raw());
 		}
 	}
-	program_data.render_context.command_queue.write_buffer(
+	program_data.render_context.gpu_command_queue.write_buffer(
 		&program_data.render_assets.example_models.culled_instances_buffer,
 		0,
 		bytemuck::cast_slice(&new_model_instances_data),
@@ -28,7 +28,7 @@ pub fn update_gpu_buffers(program_data: &mut ProgramData) {
 	
 	// camera.buffer
 	let camera_gpu_data = program_data.camera_data.build_gpu_data(program_data.render_context.aspect_ratio);
-	program_data.render_context.command_queue.write_buffer(
+	program_data.render_context.gpu_command_queue.write_buffer(
 		&program_data.render_assets.camera.buffer,
 		0,
 		bytemuck::cast_slice(&camera_gpu_data),
@@ -36,8 +36,8 @@ pub fn update_gpu_buffers(program_data: &mut ProgramData) {
 	
 	// shadow_caster.proj_mat_buffer
 	let shadow_caster_gpu_data = program_data.shadow_caster_data.build_gpu_data(program_data.camera_data.pos);
-	program_data.render_context.command_queue.write_buffer(
-		&program_data.render_assets.shadow_caster.proj_mat_buffer,
+	program_data.render_context.gpu_command_queue.write_buffer(
+		&program_data.render_assets.shadowmap.proj_mat_buffer,
 		0,
 		bytemuck::cast_slice(&shadow_caster_gpu_data),
 	);

@@ -1,18 +1,9 @@
-use crate::prelude::*;
-use wgpu::ExperimentalFeatures;
-use winit::{dpi::PhysicalPosition, window::Window};
-use serde_hjson::{Map, Value};
+use crate::*;
 
 
 
-pub mod load_layouts;
-pub use load_layouts::*;
 pub mod load_assets;
 pub use load_assets::*;
-pub mod load_bindings;
-pub use load_bindings::*;
-
-
 
 
 
@@ -38,7 +29,6 @@ pub fn load_program_data<'a>(start_time: Instant, window: &'a Window) -> Result<
 	
 	// render data
 	let render_context = load_render_context_data(window, &engine_config)?;
-	let render_layouts = load_render_layouts(&render_context)?;
 	let render_assets = load_render_assets(
 		&camera_data,
 		&shadow_caster_data,
@@ -48,7 +38,8 @@ pub fn load_program_data<'a>(start_time: Instant, window: &'a Window) -> Result<
 		&color_correction_settings,
 		engine_config.compress_textures,
 	)?;
-	let render_bindings = load_render_bindings(&render_context, &render_layouts, &render_assets)?;
+	let module_layouts = load_all_module_layouts(&render_context)?;
+	let module_bindings = load_all_module_bindings(&render_context, &module_layouts, &render_assets);
 	
 	Ok(ProgramData {
 		
@@ -67,9 +58,9 @@ pub fn load_program_data<'a>(start_time: Instant, window: &'a Window) -> Result<
 		
 		// render data
 		render_context,
-		render_layouts,
+		module_layouts,
 		render_assets,
-		render_bindings,
+		module_bindings,
 		dt_frame_start: start_time,
 		min_dur_frame_start: start_time,
 		
@@ -92,7 +83,7 @@ const LATEST_CONFIG_VERSION: usize = CONFIG_UPDATER_FUNCTIONS.len() + 1;
 pub fn load_engine_config() -> Result<EngineConfig> {
 	
 	let engine_config_path = utils::get_program_file_path("engine config.hjson");
-	let engine_config_result = fs::read_to_string(&engine_config_path);
+	let engine_config_result = fs_read_to_string(&engine_config_path);
 	let engine_config_string = match &engine_config_result {
 		StdResult::Ok(v) => &**v,
 		StdResult::Err(err) => {
@@ -242,43 +233,40 @@ pub fn load_example_model_instance_datas() -> Vec<InstanceData> {
 
 
 
-pub fn load_render_context_data<'a>(window: &'a Window, engine_config: &load::EngineConfig) -> Result<RenderContextData<'a>> {
+pub fn load_render_context_data<'a>(window: &'a Window, engine_config: &load::EngineConfig) -> Result<RenderContext<'a>> {
 	smol::block_on(load_render_context_data_async(window, engine_config))
 }
 
-pub async fn load_render_context_data_async<'a>(window: &'a Window, engine_config: &load::EngineConfig) -> Result<RenderContextData<'a>> {
+pub async fn load_render_context_data_async<'a>(window: &'a Window, engine_config: &load::EngineConfig) -> Result<RenderContext<'a>> {
 	let surface_size = window.inner_size();
 	
 	// The instance is a handle to our GPU
 	// Backends::all => Vulkan + Metal + DX12 + Browser WebGPU
-	let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
-		backends: engine_config.rendering_backend,
-		..Default::default()
-	});
+	let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
 	
 	// Handle to a presentable surface
-	let surface = instance.create_surface(window).context("Failed to create drawable surface for window.")?;
+	let window_surface = instance.create_surface(window).context("Failed to create drawable surface for window.")?;
 	
 	// Handle to a physical graphics and/or compute device
-	let mut adapter = instance.request_adapter(
+	let adapter = instance.request_adapter(
 		&wgpu::RequestAdapterOptions {
 			power_preference: wgpu::PowerPreference::default(),
-			compatible_surface: Some(&surface),
+			compatible_surface: Some(&window_surface),
 			force_fallback_adapter: false,
 		},
 	).await.context("Failed to obtain gpu adapter")?;
 	
 	// Open connection to a graphics and/or compute device, Handle to a command queue on a device
-	let (device, command_queue) = adapter.request_device(&wgpu::DeviceDescriptor {
+	let (gpu_device, gpu_command_queue) = adapter.request_device(&wgpu::DeviceDescriptor {
 		label: None,
 		required_features: wgpu::Features::empty() | wgpu::Features::TEXTURE_COMPRESSION_BC,
 		required_limits: wgpu::Limits::downlevel_defaults(),
-		experimental_features: ExperimentalFeatures::default(),
+		experimental_features: wgpu::ExperimentalFeatures::default(),
 		memory_hints: wgpu::MemoryHints::Performance,
 		trace: wgpu::Trace::Off,
 	}).await.context("Failed to create connection to gpu.")?;
 	
-	let surface_caps = surface.get_capabilities(&adapter);
+	let surface_caps = window_surface.get_capabilities(&adapter);
 	let surface_format = surface_caps.formats.iter()
 		.copied()
 		.find(|f| f.is_srgb())
@@ -293,16 +281,16 @@ pub async fn load_render_context_data_async<'a>(window: &'a Window, engine_confi
 		view_formats: vec![],
 		desired_maximum_frame_latency: engine_config.desired_frame_latency,
 	};
-	surface.configure(&device, &surface_config);
+	window_surface.configure(&gpu_device, &surface_config);
 	
 	//let limits = device.limits();
 	//println!("Max 2D Texture Array Layers: {}", limits.max_texture_array_layers);
 	
-	Ok(RenderContextData {
+	Ok(RenderContext {
+		gpu_device,
+		gpu_command_queue,
 		window,
-		drawable_surface: surface,
-		device,
-		command_queue,
+		window_surface,
 		surface_config,
 		surface_size,
 		surface_format,

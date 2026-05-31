@@ -4,4 +4,4 @@ Switching to a bind group is costly and should be minimized
 
 
 Render passes are very expensive
-A render pass is defined its color attachments (output) and depth stencil
+A render pass is defined by its color attachments (output) and depth stencil

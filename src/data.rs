@@ -1,5 +1,4 @@
-use crate::prelude::*;
-use winit::{dpi::PhysicalPosition, keyboard::KeyCode};
+use crate::*;
 
 
 
@@ -19,14 +18,10 @@ pub struct ProgramData<'a> {
 	pub color_correction_settings: ColorCorrectionSettings,
 	
 	// render data
-	pub render_context: RenderContextData<'a>,
-	// HELP: There are (currently) three render 'modules': shadow_caster, models, and
-	// skybox. The layouts for all three are created, then the assets (buffers, tex
-	// views, etc) for all three are created, then the bindings to the assets for all
-	// three are created.
-	pub render_layouts: RenderLayouts,
-	pub render_assets: RenderAssets,
-	pub render_bindings: RenderBindings,
+	pub render_context: RenderContext<'a>,
+	pub render_assets: RenderAssets,        // everything that the gpu will need to access
+	pub module_layouts: AllModuleLayouts,   // defines the layout of pipelines and bindings
+	pub module_bindings: AllModuleBindings, // gives shaders access to render assets
 	pub dt_frame_start: Instant,
 	pub min_dur_frame_start: Instant,
 	
@@ -235,11 +230,11 @@ impl Default for ColorCorrectionSettings {
 
 
 
-pub struct RenderContextData<'a> {
+pub struct RenderContext<'a> {
+	pub gpu_device: wgpu::Device,
+	pub gpu_command_queue: wgpu::Queue,
 	pub window: &'a Window,
-	pub drawable_surface: wgpu::Surface<'a>,
-	pub device: wgpu::Device,
-	pub command_queue: wgpu::Queue,
+	pub window_surface: wgpu::Surface<'a>,
 	pub surface_config: wgpu::SurfaceConfiguration,
 	pub surface_size: winit::dpi::PhysicalSize<u32>,
 	pub surface_format: wgpu::TextureFormat,
@@ -248,51 +243,21 @@ pub struct RenderContextData<'a> {
 
 
 
-pub struct RenderLayouts {
-	
-	// shadow_caster render data
-	pub shadow_caster_pipeline: wgpu::RenderPipeline,
-	pub shadow_caster_bind_0_layout: wgpu::BindGroupLayout,
-	
-	// models render data
-	pub models_pipeline: wgpu::RenderPipeline,
-	pub models_bind_0_layout: wgpu::BindGroupLayout,
-	pub models_bind_1_layout: wgpu::BindGroupLayout,
-	
-	// skybox render data
-	pub skybox_pipeline: wgpu::RenderPipeline,
-	pub skybox_bind_0_layout: wgpu::BindGroupLayout,
-	
-	// color correction data
-	pub color_correction_pipeline: wgpu::RenderPipeline,
-	pub color_correction_bind_0_layout: wgpu::BindGroupLayout,
-	
-}
-
-
-
 // this holds buffers, views, samplers, etc
 pub struct RenderAssets {
 	
 	// general render data
-	pub depth: DepthRenderData,
+	pub main_tex_depth: DepthRenderData,
 	pub main_tex_view: wgpu::TextureView,
 	pub camera: CameraRenderData,
 	pub default_sampler: wgpu::Sampler,
 	pub materials_storage: MaterialsStorage,
 	
-	// shadow_caster render data
-	pub shadow_caster: ShadowCasterRenderData,
-	
-	// models render data
-	pub example_models: ModelsRenderData,
-	
-	// skybox render data
+	pub shadowmap: ShadowmapRenderAssets,
+	pub example_models: ModelsRenderAssets,
 	pub skybox_material_id: MaterialId,
 	pub skybox_sampler: wgpu::Sampler,
-	
-	// color correction data
-	pub color_correction_buffer: wgpu::Buffer,
+	pub post_processing_buffer: wgpu::Buffer,
 	
 }
 
@@ -318,7 +283,7 @@ pub struct MaterialRenderData {
 	pub view: wgpu::TextureView,
 }
 
-pub struct ModelsRenderData {
+pub struct ModelsRenderAssets {
 	// defines the data per model
 	pub culled_instances_buffer: wgpu::Buffer,
 	pub culled_instances_count: u32,
@@ -343,7 +308,7 @@ pub struct DepthRenderData {
 	pub view: wgpu::TextureView,
 }
 
-pub struct ShadowCasterRenderData {
+pub struct ShadowmapRenderAssets {
 	pub depth_tex_view: wgpu::TextureView,
 	pub depth_sampler: wgpu::Sampler,
 	pub proj_mat_buffer: wgpu::Buffer,
@@ -355,25 +320,6 @@ pub struct ShadowCasterRenderData {
 // to `CameraRenderData` each frame (or whenever needed)
 pub struct CameraRenderData {
 	pub buffer: wgpu::Buffer,
-}
-
-
-
-pub struct RenderBindings {
-	
-	// shadow_caster render data
-	pub shadow_caster_bind_0: wgpu::BindGroup,
-	
-	// models render data
-	pub models_bind_0: wgpu::BindGroup,
-	pub example_models_bind_1s: Vec<wgpu::BindGroup>, // corresponds to the vec in render_assets.example_models.meshes
-	
-	// skybox render data
-	pub skybox_bind_0: wgpu::BindGroup,
-	
-	// color correction data
-	pub color_correction_bind_0: wgpu::BindGroup,
-	
 }
 
 
@@ -451,9 +397,8 @@ impl RawInstanceData {
 		6 => Float32x4
 	];
 	pub const fn get_layout() -> wgpu::VertexBufferLayout<'static> {
-		use std::mem;
 		wgpu::VertexBufferLayout {
-			array_stride: mem::size_of::<RawInstanceData>() as wgpu::BufferAddress,
+			array_stride: std::mem::size_of::<RawInstanceData>() as wgpu::BufferAddress,
 			step_mode: wgpu::VertexStepMode::Instance,
 			attributes: &Self::ATTRIBUTES,
 		}

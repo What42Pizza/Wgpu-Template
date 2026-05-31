@@ -1,5 +1,4 @@
-use crate::prelude::*;
-use std::io::{BufReader, Cursor};
+use crate::*;
 use wgpu::util::DeviceExt;
 
 
@@ -8,7 +7,7 @@ pub fn load_render_assets(
 	camera_data: &CameraData,
 	shadow_caster_data: &ShadowCasterData,
 	example_model_instance_datas: &[InstanceData],
-	render_context: &RenderContextData,
+	render_context: &RenderContext,
 	shadowmap_size: u32,
 	color_correction_settings: &ColorCorrectionSettings,
 	compress_textures: bool,
@@ -18,7 +17,7 @@ pub fn load_render_assets(
 	let camera = load_camera_render_data(render_context, camera_data).context("Failed to load camera render data.")?;
 	let depth = load_depth_render_data(render_context);
 	let main_tex_view = load_main_tex_data(render_context);
-	let default_sampler = render_context.device.create_sampler(&wgpu::SamplerDescriptor {
+	let default_sampler = render_context.gpu_device.create_sampler(&wgpu::SamplerDescriptor {
 		address_mode_u: wgpu::AddressMode::ClampToEdge,
 		address_mode_v: wgpu::AddressMode::ClampToEdge,
 		address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -37,7 +36,7 @@ pub fn load_render_assets(
 	
 	// skybox data
 	let skybox_material_id = load_skybox_material(render_context, &mut materials_storage, compress_textures).context("Failed to load skybox render data.")?;
-	let skybox_sampler = render_context.device.create_sampler(&wgpu::SamplerDescriptor {
+	let skybox_sampler = render_context.gpu_device.create_sampler(&wgpu::SamplerDescriptor {
 		address_mode_u: wgpu::AddressMode::ClampToEdge,
 		address_mode_v: wgpu::AddressMode::ClampToEdge,
 		address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -48,7 +47,7 @@ pub fn load_render_assets(
 	});
 	
 	// color correction data
-	let color_correction_buffer = render_context.device.create_buffer_init(
+	let color_correction_buffer = render_context.gpu_device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
 			label: Some("color_correction_buffer"),
 			contents: bytemuck::bytes_of(color_correction_settings),
@@ -58,20 +57,20 @@ pub fn load_render_assets(
 	
 	Ok(RenderAssets {
 		
-		depth,
+		main_tex_depth: depth,
 		main_tex_view,
 		camera,
 		default_sampler,
 		materials_storage,
 		
-		shadow_caster,
+		shadowmap: shadow_caster,
 		
 		example_models,
 		
 		skybox_material_id,
 		skybox_sampler,
 		
-		color_correction_buffer,
+		post_processing_buffer: color_correction_buffer,
 		
 	})
 }
@@ -80,9 +79,9 @@ pub fn load_render_assets(
 
 
 
-pub fn load_camera_render_data(render_context: &RenderContextData, camera_data: &CameraData) -> Result<CameraRenderData> {
+pub fn load_camera_render_data(render_context: &RenderContext, camera_data: &CameraData) -> Result<CameraRenderData> {
 	
-	let buffer = render_context.device.create_buffer_init(
+	let buffer = render_context.gpu_device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
 			label: Some("camera_buffer"),
 			contents: bytemuck::cast_slice(&camera_data.build_gpu_data(render_context.aspect_ratio)),
@@ -99,7 +98,7 @@ pub fn load_camera_render_data(render_context: &RenderContextData, camera_data: 
 
 
 
-pub fn load_depth_render_data(render_context: &RenderContextData) -> DepthRenderData {
+pub fn load_depth_render_data(render_context: &RenderContext) -> DepthRenderData {
 	
 	let size = wgpu::Extent3d {
 		width: render_context.surface_config.width,
@@ -116,7 +115,7 @@ pub fn load_depth_render_data(render_context: &RenderContextData) -> DepthRender
 		usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
 		view_formats: &[],
 	};
-	let texture = render_context.device.create_texture(&desc);
+	let texture = render_context.gpu_device.create_texture(&desc);
 	
 	let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 	
@@ -129,7 +128,7 @@ pub fn load_depth_render_data(render_context: &RenderContextData) -> DepthRender
 
 
 
-pub fn load_main_tex_data(render_context: &RenderContextData) -> wgpu::TextureView {
+pub fn load_main_tex_data(render_context: &RenderContext) -> wgpu::TextureView {
 	
 	let size = wgpu::Extent3d {
 		width: render_context.surface_config.width,
@@ -146,7 +145,7 @@ pub fn load_main_tex_data(render_context: &RenderContextData) -> wgpu::TextureVi
 		usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
 		view_formats: &[],
 	};
-	let texture = render_context.device.create_texture(&desc);
+	let texture = render_context.gpu_device.create_texture(&desc);
 	
 	let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 	
@@ -158,7 +157,7 @@ pub fn load_main_tex_data(render_context: &RenderContextData) -> wgpu::TextureVi
 
 
 
-pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_size: u32, shadow_caster_data: &ShadowCasterData, camera_data: &CameraData) -> Result<ShadowCasterRenderData> {
+pub fn load_shadow_caster_data(render_context: &RenderContext, shadowmap_size: u32, shadow_caster_data: &ShadowCasterData, camera_data: &CameraData) -> Result<ShadowmapRenderAssets> {
 	
 	let size = wgpu::Extent3d {
 		width: shadowmap_size,
@@ -175,9 +174,9 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 		usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
 		view_formats: &[],
 	};
-	let depth_tex = render_context.device.create_texture(&desc);
+	let depth_tex = render_context.gpu_device.create_texture(&desc);
 	let depth_tex_view = depth_tex.create_view(&wgpu::TextureViewDescriptor::default());
-	let depth_sampler = render_context.device.create_sampler(&wgpu::SamplerDescriptor {
+	let depth_sampler = render_context.gpu_device.create_sampler(&wgpu::SamplerDescriptor {
 		address_mode_u: wgpu::AddressMode::ClampToEdge,
 		address_mode_v: wgpu::AddressMode::ClampToEdge,
 		address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -188,7 +187,7 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 		..Default::default()
 	});
 	
-	let proj_mat_buffer = render_context.device.create_buffer_init(
+	let proj_mat_buffer = render_context.gpu_device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
 			label: Some("shadow_caster_buffer"),
 			contents: bytemuck::cast_slice(&shadow_caster_data.build_gpu_data(camera_data.pos)),
@@ -196,7 +195,7 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 		}
 	);
 	
-	Ok(ShadowCasterRenderData {
+	Ok(ShadowmapRenderAssets {
 		depth_tex_view,
 		depth_sampler,
 		proj_mat_buffer,
@@ -208,23 +207,23 @@ pub fn load_shadow_caster_data(render_context: &RenderContextData, shadowmap_siz
 
 
 pub fn load_example_models_render_data(
-	render_context: &RenderContextData,
+	render_context: &RenderContext,
 	materials_storage: &mut MaterialsStorage,
 	instance_datas: &[InstanceData],
 	compress_textures: bool,
-) -> Result<ModelsRenderData> {
+) -> Result<ModelsRenderAssets> {
 	
 	let (example_model_meshes, bounding_radius) = load_model(utils::get_program_file_path("assets/cube.obj"), render_context, materials_storage, compress_textures)?;
 	
 	let example_model_instance_datas = instance_datas.iter().map(InstanceData::to_raw).collect::<Vec<_>>();
-	let culled_instances_buffer = render_context.device.create_buffer_init(
+	let culled_instances_buffer = render_context.gpu_device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
 			label: Some("example_models_instances_buffer"),
 			contents: bytemuck::cast_slice(&example_model_instance_datas),
 			usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
 		}
 	);
-	let total_instances_buffer = render_context.device.create_buffer_init(
+	let total_instances_buffer = render_context.gpu_device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
 			label: Some("example_models_instances_buffer"),
 			contents: bytemuck::cast_slice(&example_model_instance_datas),
@@ -232,7 +231,7 @@ pub fn load_example_models_render_data(
 		}
 	);
 	
-	Ok(ModelsRenderData {
+	Ok(ModelsRenderAssets {
 		culled_instances_buffer,
 		culled_instances_count: example_model_instance_datas.len() as u32,
 		total_instances_buffer,
@@ -246,13 +245,13 @@ pub fn load_example_models_render_data(
 
 pub fn load_model(
 	file_path: impl AsRef<Path>,
-	render_context: &RenderContextData,
+	render_context: &RenderContext,
 	materials_storage: &mut MaterialsStorage,
 	compress_textures: bool,
 ) -> Result<(Vec<MeshRenderData>, f32)> {
 	let file_path = file_path.as_ref();
 	let parent_folder = file_path.parent().expect("Cannot load mesh at root directory");
-	let obj_text = fs::read_to_string(file_path).add_path_to_error(file_path)?;
+	let obj_text = fs_read_to_string(file_path)?;
 	let obj_cursor = Cursor::new(obj_text);
 	let mut obj_reader = BufReader::new(obj_cursor);
 	
@@ -265,7 +264,7 @@ pub fn load_model(
 		},
 		move |p| {
 			let mat_text =
-				fs::read_to_string(parent_folder.join(p))
+				fs_read_to_string(parent_folder.join(p))
 				//.add_path_to_error(&file_path) // this would just be thrown away in the next map_err()
 				.map_err(|_err| tobj::LoadError::OpenFileFailed)?;
 			tobj::load_mtl_buf(&mut BufReader::new(Cursor::new(mat_text)))
@@ -319,17 +318,17 @@ pub fn load_model(
 				});
 			}
 			
-			let basic_vertex_buffer = render_context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+			let basic_vertex_buffer = render_context.gpu_device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
 				label: Some(&format!("'{:?}'_basic_vertex_buffer", &file_path)),
 				contents: bytemuck::cast_slice(&basic_vertices),
 				usage: wgpu::BufferUsages::VERTEX,
 			});
-			let extended_vertex_buffer = render_context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+			let extended_vertex_buffer = render_context.gpu_device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
 				label: Some(&format!("'{:?}'_extended_vertex_buffer", &file_path)),
 				contents: bytemuck::cast_slice(&extended_vertices),
 				usage: wgpu::BufferUsages::VERTEX,
 			});
-			let index_buffer = render_context.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+			let index_buffer = render_context.gpu_device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
 				label: Some(&format!("'{:?}'_index_buffer", &file_path)),
 				contents: bytemuck::cast_slice(&model.mesh.indices),
 				usage: wgpu::BufferUsages::INDEX,
@@ -352,6 +351,6 @@ pub fn load_model(
 
 
 
-pub fn load_skybox_material(render_context: &RenderContextData, materials_storage: &mut MaterialsStorage, compress_textures: bool) -> Result<usize> {
+pub fn load_skybox_material(render_context: &RenderContext, materials_storage: &mut MaterialsStorage, compress_textures: bool) -> Result<usize> {
 	materials_storage_utils::insert_material_cube(utils::get_program_file_path("assets/skybox.png"), materials_storage, render_context, compress_textures)
 }

@@ -1,5 +1,5 @@
 // Started:      24/04/18
-// Last updated: 26/01/08
+// Last updated: 26/05/31
 
 // Learn Wgpu website: https://sotrh.github.io/learn-wgpu/
 // Learn Wgpu repo: https://github.com/sotrh/learn-wgpu
@@ -22,49 +22,54 @@
 
 
 
-pub mod load;
-pub mod update;
-pub mod update_gpu_buffers;
-pub mod render;
-pub mod data;
-pub mod materials_storage_utils;
-pub mod utils;
+pub use std::{
+	collections::{HashMap, HashSet},
+	path::{Path, PathBuf},
+	time::{Duration, Instant},
+	io::{BufReader, Cursor},
+};
+pub use std::result::Result as StdResult;
+pub use rayon::iter::{ParallelIterator, IntoParallelRefIterator, IndexedParallelIterator};
+pub use log::{info, warn, debug, error};
+pub use anyhow::*;
+pub use serde_hjson::{Map, Value};
 
-pub mod prelude {
-	pub use crate::{*, data::*, utils::IoResultFns};
-	pub use std::{
-		fs,
-		collections::{HashMap, HashSet},
-		path::{Path, PathBuf},
-		time::{Duration, Instant}
-	};
-	pub use std::result::Result as StdResult;
-	pub use rayon::iter::{ParallelIterator, IntoParallelRefIterator};
-	pub use log::{info, warn, debug, error};
-	pub use anyhow::*;
-}
-
-use crate::prelude::*;
-use std::{env, thread};
-use winit::{
+pub use winit::{
 	application::ApplicationHandler,
 	dpi::{PhysicalPosition, PhysicalSize},
 	event::{KeyEvent, MouseButton, WindowEvent},
 	event_loop::{ActiveEventLoop, EventLoop},
-	keyboard::PhysicalKey,
+	keyboard::{PhysicalKey, KeyCode},
 	platform::pump_events::EventLoopExtPumpEvents,
-	window::{Fullscreen, Window, WindowId}
+	window::{Window, WindowId},
 };
+
+
+
+pub mod load;
+pub use load::*;
+pub mod update;
+pub use update::*;
+pub mod update_gpu_buffers;
+pub use update_gpu_buffers::*;
+pub mod render_modules;
+pub use render_modules::*;
+pub mod data;
+pub use data::*;
+pub mod materials_storage_utils;
+pub use materials_storage_utils::*;
+pub mod utils;
+pub use utils::*;
 
 
 
 fn main() -> Result<()> {
 	let start_time = Instant::now();
 	
-	if env::var("RUST_LOG").is_err() {
+	if std::env::var("RUST_LOG").is_err() {
 		unsafe {
 			// safety: this seems to only be unsafe if other threads might be reading/writing env vars, and that should not be possible yet since this is the start of the program
-			env::set_var("RUST_LOG", "warn");
+			std::env::set_var("RUST_LOG", "warn");
 		}
 	}
 	env_logger::init();
@@ -88,7 +93,7 @@ fn main() -> Result<()> {
 	};
 	
 	info!("Done, initialing program...");
-	let mut program_data = load::load_program_data(start_time, &window)?;
+	let mut program_data = load_program_data(start_time, &window)?;
 	window.set_visible(true);
 	window.focus_window();
 	
@@ -250,10 +255,10 @@ pub fn resize(program_data: &mut ProgramData, new_size: PhysicalSize<u32>) -> Re
 	render_context.surface_config.width = new_size.width;
 	render_context.surface_config.height = new_size.height;
 	if new_size.width == 0 || new_size.height == 0 {return Ok(());}
-	render_context.drawable_surface.configure(&render_context.device, &render_context.surface_config);
-	program_data.render_assets.depth = load::load_depth_render_data(render_context);
-	program_data.render_assets.main_tex_view = load::load_main_tex_data(render_context);
-	program_data.render_bindings = load::load_render_bindings(&program_data.render_context, &program_data.render_layouts, &program_data.render_assets)?;
+	render_context.window_surface.configure(&render_context.gpu_device, &render_context.surface_config);
+	program_data.render_assets.main_tex_depth = load_depth_render_data(render_context);
+	program_data.render_assets.main_tex_view = load_main_tex_data(render_context);
+	program_data.module_bindings = load_all_module_bindings(&program_data.render_context, &program_data.module_layouts, &program_data.render_assets);
 	Ok(())
 }
 
@@ -267,7 +272,7 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 	let frame_start_time = Instant::now();
 	
 	let dt = program_data.step_dt();
-	let should_exit = update::update(program_data, dt)?;
+	let should_exit = update(program_data, dt)?;
 	if should_exit {
 		event_loop.exit();
 		return Ok(());
@@ -280,30 +285,24 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 	if size.width > 0 && size.height > 0 {
 		
 		
-		let surface_output_result = render_context.drawable_surface.get_current_texture();
-		let surface_output = match surface_output_result {
-			StdResult::Ok(v) => v,
-			StdResult::Err(wgpu::SurfaceError::Lost) => {
-				warn!("Surface was lost, attempting to resize...");
-				resize(program_data, render_context.surface_size).context("Failed to resize window.")?;
-				program_data.render_context.drawable_surface.get_current_texture().context("Failed to get current window drawable texture, even after resize.")?
-			}
-			StdResult::Err(wgpu::SurfaceError::Outdated) => {
-				warn!("Surface is outdated, attempting to resize...");
-				resize(program_data, render_context.surface_size).context("Failed to resize window.")?;
-				program_data.render_context.drawable_surface.get_current_texture().context("Failed to get current window drawable texture, even after resize.")?
-			}
-			StdResult::Err(wgpu::SurfaceError::OutOfMemory) => {
-				warn!("OutOfMemory error while rendering, exiting process.");
-				event_loop.exit();
+		let surface_tex = match render_context.window_surface.get_current_texture() {
+			wgpu::CurrentSurfaceTexture::Success (frame) => frame,
+			wgpu::CurrentSurfaceTexture::Timeout
+			| wgpu::CurrentSurfaceTexture::Occluded => {
 				return Ok(());
 			}
-			StdResult::Err(err) => return Err(err.into()),
+			wgpu::CurrentSurfaceTexture::Outdated
+			| wgpu::CurrentSurfaceTexture::Lost
+			| wgpu::CurrentSurfaceTexture::Suboptimal (_)
+			| wgpu::CurrentSurfaceTexture::Validation => {
+				render_context.window_surface.configure(&render_context.gpu_device, &render_context.surface_config);
+				return Ok(());
+			}
 		};
 		
-		update_gpu_buffers::update_gpu_buffers(program_data);
+		update_gpu_buffers(program_data);
 		
-		render::render(&surface_output, program_data);
+		render(&surface_tex, program_data);
 		
 		
 		let fps_counter_output = program_data.fps_counter.step(frame_start_time.elapsed());
@@ -328,13 +327,13 @@ pub fn redraw_requested(program_data: &mut ProgramData, event_loop: &ActiveEvent
 		let min_frame_time = program_data.engine_config.min_frame_time;
 		if frame_time < min_frame_time {
 			let sleep_time = min_frame_time - frame_time;
-			thread::sleep(sleep_time);
+			std::thread::sleep(sleep_time);
 		}
 		program_data.min_dur_frame_start = Instant::now();
 		
 		
 		program_data.render_context.window.pre_present_notify();
-		surface_output.present();
+		surface_tex.present();
 		
 		let input = &mut program_data.input;
 		input.mouse_vel = PhysicalPosition::default();
