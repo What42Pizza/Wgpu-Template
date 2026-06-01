@@ -256,7 +256,7 @@ pub fn resize(program_data: &mut ProgramData, new_size: PhysicalSize<u32>) -> Re
 	render_context.surface_config.height = new_size.height;
 	if new_size.width == 0 || new_size.height == 0 {return Ok(());}
 	render_context.window_surface.configure(&render_context.gpu_device, &render_context.surface_config);
-	program_data.render_assets.main_tex_depth = load_depth_render_data(render_context);
+	program_data.render_assets.main_depth_view = load_depth_render_data(render_context);
 	program_data.render_assets.main_tex_view = load_main_tex_data(render_context);
 	program_data.module_bindings = load_all_module_bindings(&program_data.render_context, &program_data.module_layouts, &program_data.render_assets);
 	Ok(())

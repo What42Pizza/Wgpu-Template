@@ -1,5 +1,5 @@
 @group(0) @binding(0) var<uniform> camera_data: CameraData;
-@group(0) @binding(1) var<uniform> shadow_caster_proj_mat: mat4x4f;
+@group(0) @binding(1) var<uniform> shadowmap_proj_mat: mat4x4f;
 @group(0) @binding(2) var material_sampler: sampler;
 @group(0) @binding(3) var shadowmap_texture: texture_depth_2d;
 @group(0) @binding(4) var shadowmap_sampler: sampler_comparison;
@@ -64,7 +64,7 @@ struct VertexOutput {
 
 
 fn sample_shadows(world_pos: vec3f) -> f32 {
-	var shadowmap_pos = shadow_caster_proj_mat * vec4(world_pos, 1.0);
+	var shadowmap_pos = shadowmap_proj_mat * vec4(world_pos, 1.0);
 	// shadowmap_pos starts in range -1 to 1 with y going up, but we need 0 to 1 with y going down
 	shadowmap_pos = vec4(shadowmap_pos.xyz * vec3(0.5, -0.5, 0.5) + 0.5, 1.0);
 	return textureSampleCompareLevel(shadowmap_texture, shadowmap_sampler, shadowmap_pos.xy, shadowmap_pos.z);

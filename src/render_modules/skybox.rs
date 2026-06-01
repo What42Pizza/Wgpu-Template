@@ -120,7 +120,7 @@ pub fn load_bindings(render_context: &RenderContext, render_layouts: &SkyboxLayo
 		entries: &[
 			wgpu::BindGroupEntry {
 				binding: 0,
-				resource: render_assets.camera.buffer.as_entire_binding(),
+				resource: render_assets.camera_data.as_entire_binding(),
 			},
 			wgpu::BindGroupEntry {
 				binding: 1,
@@ -152,7 +152,7 @@ pub fn render(layouts: &SkyboxLayouts, assets: &RenderAssets, bindings: &SkyboxB
 			},
 		})],
 		depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-			view: &assets.main_tex_depth.view,
+			view: &assets.main_depth_view,
 			depth_ops: Some(wgpu::Operations {
 				load: wgpu::LoadOp::Load,
 				store: wgpu::StoreOp::Store,

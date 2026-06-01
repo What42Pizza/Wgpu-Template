@@ -14,7 +14,7 @@ pub struct ModelsMainBindings (wgpu::BindGroup, Vec<wgpu::BindGroup>);
 
 pub fn load_layout(render_context: &RenderContext) -> Result<ModelsMainLayouts> {
 	
-	let models_shader_path = utils::get_program_file_path("shaders/models.wgsl");
+	let models_shader_path = utils::get_program_file_path("shaders/models_main.wgsl");
 	let models_shader_source = fs_read_to_string(&models_shader_path)?;
 	let models_shader = render_context.gpu_device.create_shader_module(wgpu::ShaderModuleDescriptor {
 		label: Some("models_shader_module"),
@@ -158,7 +158,7 @@ pub fn load_bindings(render_context: &RenderContext, render_layouts: &ModelsMain
 		entries: &[
 			wgpu::BindGroupEntry {
 				binding: 0,
-				resource: render_assets.camera.buffer.as_entire_binding(),
+				resource: render_assets.camera_data.as_entire_binding(),
 			},
 			wgpu::BindGroupEntry {
 				binding: 1,
@@ -219,7 +219,7 @@ pub fn render(layouts: &ModelsMainLayouts, assets: &RenderAssets, bindings: &Mod
 			},
 		})],
 		depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-			view: &assets.main_tex_depth.view,
+			view: &assets.main_depth_view,
 			depth_ops: Some(wgpu::Operations {
 				load: wgpu::LoadOp::Clear (1.0),
 				store: wgpu::StoreOp::Store,

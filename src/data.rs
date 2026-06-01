@@ -247,9 +247,9 @@ pub struct RenderContext<'a> {
 pub struct RenderAssets {
 	
 	// general render data
-	pub main_tex_depth: DepthRenderData,
+	pub main_depth_view: wgpu::TextureView,
 	pub main_tex_view: wgpu::TextureView,
-	pub camera: CameraRenderData,
+	pub camera_data: wgpu::Buffer,
 	pub default_sampler: wgpu::Sampler,
 	pub materials_storage: MaterialsStorage,
 	
@@ -262,8 +262,8 @@ pub struct RenderAssets {
 }
 
 pub struct MaterialsStorage {
-	pub list_2d: Vec<MaterialRenderData>,
-	pub list_cube: Vec<MaterialRenderData>,
+	pub list_2d: Vec<MaterialRenderAssets>,
+	pub list_cube: Vec<MaterialRenderAssets>,
 }
 
 impl MaterialsStorage {
@@ -277,7 +277,7 @@ impl MaterialsStorage {
 
 pub type MaterialId = usize;
 
-pub struct MaterialRenderData {
+pub struct MaterialRenderAssets {
 	// `path` is used to make sure the same data isn't loaded multiple times
 	pub path: PathBuf,
 	pub view: wgpu::TextureView,
@@ -301,25 +301,10 @@ pub struct MeshRenderData {
 	pub material_id: MaterialId,
 }
 
-// HELP: Many structs like this only have whatever data is actually used, if you run into
-// a situation where you also need the Texture, Sampler, etc then you can just add them
-// to the relevant struct
-pub struct DepthRenderData {
-	pub view: wgpu::TextureView,
-}
-
 pub struct ShadowmapRenderAssets {
 	pub depth_tex_view: wgpu::TextureView,
 	pub depth_sampler: wgpu::Sampler,
 	pub proj_mat_buffer: wgpu::Buffer,
-}
-
-// HELP: It may be a bit disorienting to have two Camera structs, but just keep this is
-// mind: the struct `CameraData` holds the data used for app logic, the struct
-// `CameraRenderData` holds the data for rendering logic, and data is moved from `Camera`
-// to `CameraRenderData` each frame (or whenever needed)
-pub struct CameraRenderData {
-	pub buffer: wgpu::Buffer,
 }
 
 

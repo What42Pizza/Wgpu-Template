@@ -13,7 +13,7 @@ pub struct PostProcessingBindings (wgpu::BindGroup);
 
 pub fn load_layout(render_context: &RenderContext) -> Result<PostProcessingLayouts> {
 	
-	let shader_path = utils::get_program_file_path("shaders/color correction.wgsl");
+	let shader_path = utils::get_program_file_path("shaders/post_processing.wgsl");
 	let shader_source = fs_read_to_string(&shader_path)?;
 	let shader = render_context.gpu_device.create_shader_module(wgpu::ShaderModuleDescriptor {
 		label: Some("post_processing_shader_module"),
@@ -23,7 +23,7 @@ pub fn load_layout(render_context: &RenderContext) -> Result<PostProcessingLayou
 	let bind_group_0 = render_context.gpu_device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 		label: Some("post_processing_bind_0_layout"),
 		entries: &[
-			wgpu::BindGroupLayoutEntry { // color correction: buffer
+			wgpu::BindGroupLayoutEntry { // post_processing: buffer
 				binding: 0,
 				visibility: wgpu::ShaderStages::FRAGMENT,
 				ty: wgpu::BindingType::Buffer {

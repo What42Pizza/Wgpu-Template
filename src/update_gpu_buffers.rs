@@ -29,17 +29,17 @@ pub fn update_gpu_buffers(program_data: &mut ProgramData) {
 	// camera.buffer
 	let camera_gpu_data = program_data.camera_data.build_gpu_data(program_data.render_context.aspect_ratio);
 	program_data.render_context.gpu_command_queue.write_buffer(
-		&program_data.render_assets.camera.buffer,
+		&program_data.render_assets.camera_data,
 		0,
 		bytemuck::cast_slice(&camera_gpu_data),
 	);
 	
-	// shadow_caster.proj_mat_buffer
-	let shadow_caster_gpu_data = program_data.shadow_caster_data.build_gpu_data(program_data.camera_data.pos);
+	// shadowmap.proj_mat_buffer
+	let shadowmap_gpu_data = program_data.shadow_caster_data.build_gpu_data(program_data.camera_data.pos);
 	program_data.render_context.gpu_command_queue.write_buffer(
 		&program_data.render_assets.shadowmap.proj_mat_buffer,
 		0,
-		bytemuck::cast_slice(&shadow_caster_gpu_data),
+		bytemuck::cast_slice(&shadowmap_gpu_data),
 	);
 	
 }

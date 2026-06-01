@@ -4,7 +4,7 @@ use crate::*;
 
 
 
-pub fn get_material_id(path: impl AsRef<Path>, list: &[MaterialRenderData]) -> Option<MaterialId> {
+pub fn get_material_id(path: impl AsRef<Path>, list: &[MaterialRenderAssets]) -> Option<MaterialId> {
 	let path = path.as_ref();
 	list.iter().enumerate()
 		.find(|(_i, material)| &*material.path == path)
@@ -44,7 +44,7 @@ pub fn load_material_2d(
 	path: impl Into<PathBuf>,
 	render_context: &RenderContext,
 	compress_textures: bool,
-) -> Result<MaterialRenderData> {
+) -> Result<MaterialRenderAssets> {
 	let path = path.into();
 	
 	let raw_texture_bytes = fs_read(utils::get_program_file_path(&path))?;
@@ -99,7 +99,7 @@ pub fn load_material_2d(
 	
 	let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 	
-	Ok(MaterialRenderData {
+	Ok(MaterialRenderAssets {
 		path,
 		view,
 	})
@@ -112,7 +112,7 @@ pub fn load_material_cube(
 	path: impl Into<PathBuf>,
 	render_context: &RenderContext,
 	compress_textures: bool,
-) -> Result<MaterialRenderData> {
+) -> Result<MaterialRenderAssets> {
 	if compress_textures {warn!("Compressed textures are not currently working for cube textures.")}
 	let compress_textures = false;
 	let path = path.into();
@@ -173,7 +173,7 @@ pub fn load_material_cube(
 		..Default::default()
 	});
 	
-	Ok(MaterialRenderData {
+	Ok(MaterialRenderAssets {
 		path,
 		view,
 	})

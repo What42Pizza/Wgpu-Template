@@ -14,7 +14,7 @@ pub fn load_render_assets(
 ) -> Result<RenderAssets> {
 	
 	// general data
-	let camera = load_camera_render_data(render_context, camera_data).context("Failed to load camera render data.")?;
+	let camera = load_camera_render_data(render_context, camera_data);
 	let depth = load_depth_render_data(render_context);
 	let main_tex_view = load_main_tex_data(render_context);
 	let default_sampler = render_context.gpu_device.create_sampler(&wgpu::SamplerDescriptor {
@@ -29,7 +29,7 @@ pub fn load_render_assets(
 	let mut materials_storage = MaterialsStorage::new();
 	
 	// shadow_caster data
-	let shadow_caster = load_shadow_caster_data(render_context, shadowmap_size, shadow_caster_data, camera_data).context("Failed to load shadow caster render data.")?;
+	let shadowmap = load_shadow_caster_data(render_context, shadowmap_size, shadow_caster_data, camera_data).context("Failed to load shadow caster render data.")?;
 	
 	// models data
 	let example_models = load_example_models_render_data(render_context, &mut materials_storage, example_model_instance_datas, compress_textures).context("Failed to load model render data.")?;
@@ -46,8 +46,8 @@ pub fn load_render_assets(
 		..Default::default()
 	});
 	
-	// color correction data
-	let color_correction_buffer = render_context.gpu_device.create_buffer_init(
+	// post_processing data
+	let post_processing_buffer = render_context.gpu_device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
 			label: Some("color_correction_buffer"),
 			contents: bytemuck::bytes_of(color_correction_settings),
@@ -57,20 +57,20 @@ pub fn load_render_assets(
 	
 	Ok(RenderAssets {
 		
-		main_tex_depth: depth,
+		main_depth_view: depth,
 		main_tex_view,
-		camera,
+		camera_data: camera,
 		default_sampler,
 		materials_storage,
 		
-		shadowmap: shadow_caster,
+		shadowmap,
 		
 		example_models,
 		
 		skybox_material_id,
 		skybox_sampler,
 		
-		post_processing_buffer: color_correction_buffer,
+		post_processing_buffer,
 		
 	})
 }
@@ -79,26 +79,21 @@ pub fn load_render_assets(
 
 
 
-pub fn load_camera_render_data(render_context: &RenderContext, camera_data: &CameraData) -> Result<CameraRenderData> {
-	
-	let buffer = render_context.gpu_device.create_buffer_init(
+pub fn load_camera_render_data(render_context: &RenderContext, camera_data: &CameraData) -> wgpu::Buffer {
+	render_context.gpu_device.create_buffer_init(
 		&wgpu::util::BufferInitDescriptor {
 			label: Some("camera_buffer"),
 			contents: bytemuck::cast_slice(&camera_data.build_gpu_data(render_context.aspect_ratio)),
 			usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
 		}
-	);
-	
-	Ok(CameraRenderData {
-		buffer,
-	})
+	)
 }
 
 
 
 
 
-pub fn load_depth_render_data(render_context: &RenderContext) -> DepthRenderData {
+pub fn load_depth_render_data(render_context: &RenderContext) -> wgpu::TextureView {
 	
 	let size = wgpu::Extent3d {
 		width: render_context.surface_config.width,
@@ -117,11 +112,7 @@ pub fn load_depth_render_data(render_context: &RenderContext) -> DepthRenderData
 	};
 	let texture = render_context.gpu_device.create_texture(&desc);
 	
-	let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-	
-	DepthRenderData {
-		view,
-	}
+	texture.create_view(&wgpu::TextureViewDescriptor::default())
 }
 
 

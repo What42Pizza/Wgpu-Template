@@ -13,7 +13,7 @@ pub struct ModelsShadowmapBindings (wgpu::BindGroup);
 
 pub fn load_layout(render_context: &RenderContext) -> Result<ModelsShadowmapLayouts> {
 	
-	let models_shadowmap_shader_path = utils::get_program_file_path("shaders/shadow caster.wgsl");
+	let models_shadowmap_shader_path = utils::get_program_file_path("shaders/models_shadowmap.wgsl");
 	let models_shadowmap_shader_source = fs_read_to_string(&models_shadowmap_shader_path)?;
 	let models_shadowmap_shader = render_context.gpu_device.create_shader_module(wgpu::ShaderModuleDescriptor {
 		label: Some("models_shadowmap_shader_module"),
